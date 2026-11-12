@@ -1,0 +1,10 @@
+data/
+target/
+node_modules/
+dist/
+# build du front (régénéré par `npm run build`)
+backend/src/main/resources/static/
+.idea/
+.vscode/
+# projet 1 d origine (déjà copié dans backend/)
+DAAR1-main/
