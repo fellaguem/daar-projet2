@@ -1,0 +1,5 @@
+a|b
+ab|cd
+a(b|c)d
+(love|hate)
+(a|b)(c|d)
