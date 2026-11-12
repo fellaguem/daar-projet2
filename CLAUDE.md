@@ -36,7 +36,7 @@ daar-projet2/
 ├── CLAUDE.md
 ├── backend/                Java 17 + Spring Boot (Maven)
 │   └── src/main/java/
-│       ├── parser/ ast/ automate/ kmp/ experimentation/   projet 1, copiés tels quels
+│       ├── parser/ ast/ automate/ kmp/ experimentation/   projet 1 (copie modifiable, voir plus bas)
 │       ├── corpus/         téléchargement + nettoyage
 │       ├── index/          découpage en mots + index inversé
 │       ├── graphe/         Jaccard + PageRank
@@ -85,9 +85,11 @@ Réponse d'une recherche (les suggestions sont incluses, le front ne fait qu'un 
 Le projet 1 (clone d'`egrep` en Java) fournit les packages `parser`, `ast`, `automate`, `kmp` et `experimentation`.
 
 - Recherche avancée : l'AFD minimal du projet 1 (`MatcherUnePasse`) est testé sur chaque mot de l'index.
-- Recherche par mot-clef : `Kmp`.
-- Ne pas changer le comportement de ces packages : ajouter de nouvelles classes à côté.
-  Exemple : une version qui compte les occurrences, alors que `contientMotif` renvoie seulement un booléen.
+- Recherche par mot-clef : recherche exacte dans l'index (dichotomie sur le vocabulaire), pas `Kmp`.
+  `Kmp` sert pour les extraits et pour la variante « texte complet » de la recherche avancée.
+- Le projet 1 copié dans `backend/` peut être modifié (compter les occurrences, étendre le parseur avec
+  `+ ? [..]`), mais les tests du projet 1 (`backend/src/test/java/projet1`) doivent rester verts, et chaque
+  changement est noté dans `docs/notes.md` (« projet 1 étendu »).
 - Limite connue : la regex ne gère que `( ) | * .` et les lettres.
 
 ## Pipeline de données (hors ligne, lancé une fois)
@@ -95,15 +97,20 @@ Le projet 1 (clone d'`egrep` en Java) fournit les packages `parser`, `ast`, `aut
 1. Corpus : téléchargement depuis Project Gutenberg (texte brut). Enlever l'en-tête et la licence Gutenberg,
    garder les livres d'au moins 10 000 mots, enregistrer les métadonnées (id, titre, auteur, URL source).
    Passer par le catalogue officiel et un miroir, avec une pause entre deux téléchargements.
-2. Index inversé : mot → (livre, nombre d'occurrences), sans les mots vides, sauvegardé sur disque.
+2. Index inversé : mot → (livre, nombre d'occurrences), sauvegardé sur disque. Les mots vides restent dans
+   l'index (chercher « the » doit marcher), seuls les mots d'une lettre sont ignorés. Les mots vides (mots
+   présents dans une grande part des livres) sont retirés du graphe de Jaccard et du classement.
+   Recherche à plusieurs mots : les livres qui contiennent tous les mots (ET), score = somme des occurrences.
 3. Graphe de Jaccard : distance de Jaccard entre les ensembles de mots des livres, arête si la distance est
    sous un seuil. Environ 1,4 million de paires : tester d'abord sur 100 livres. Sauvegarder la liste d'arêtes.
 4. PageRank sur ce graphe, précalculé et sauvegardé.
 
 ## Règles
 
-- Une seule classe découpe le texte en mots (minuscules, ponctuation retirée) : elle sert à la fois
-  pour construire l'index et pour lire les requêtes.
+- Une seule classe découpe le texte en mots (`index.Tokeniseur` : suite de lettres, en minuscules) : elle sert à la
+  fois pour construire l'index et pour lire les requêtes. Les apostrophes et tirets coupent les mots
+  (« don't » donne « don » et « t »), limite à noter dans le rapport. Les mots d'une lettre sont écartés
+  par `Index.pourChaqueMotIndexable`, la même règle pour les livres et pour les requêtes.
 - Index stocké en tableaux d'entiers (ids de livres, nombres d'occurrences), pas une `HashMap` par livre.
 - Code et commentaires en français, simples, comme dans le projet 1.
 - Les données générées vont dans `data/` et ne sont pas commitées (`.gitignore`).
