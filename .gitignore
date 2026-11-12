@@ -8,3 +8,6 @@ backend/src/main/resources/static/
 .vscode/
 # projet 1 d origine (dÃ©jÃ  copiÃ© dans backend/)
 DAAR1-main/
+
+# copie des classes pour le téléchargement du corpus
+tools/
