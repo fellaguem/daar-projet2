@@ -11,12 +11,17 @@ public class ConstructionAutomate {
     private final Afd afdMinimal;
 
     public ConstructionAutomate(AstI ast) {
+        this(ast, Integer.MAX_VALUE);
+    }
+
+    // avec une limite sur le nombre d'etats de l'AFD (AutomateTropGrandException si elle est depassee)
+    public ConstructionAutomate(AstI ast, int etatsMax) {
 
         // transformation de l'AST en AFN avec notre visitor
         this.afn = ast.accept(new AstToAfnVisitor());
 
         // on determinise l'AFN pour obtenir notre AFD
-        this.afd = new Determinisation(afn).convertir();
+        this.afd = new Determinisation(afn, etatsMax).convertir();
 
         // puis on minimise l'AFD avec Moore
         this.afdMinimal = new Minimisation(afd).minimiser();

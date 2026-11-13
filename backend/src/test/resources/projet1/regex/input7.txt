@@ -1,0 +1,26 @@
+# Syntaxe étendue du projet 2 : + ? et classes [..]
+# (on évite les enchaînements comme a++ ou a?+ : en Java ce sont des quantificateurs possessifs)
+a+
+ab+
+(ab)+
+a(b|c)+d
+love+
+colou?r
+l?ove
+(a|b)?c
+a+b*c?
+(a|b)+c
+[abc]
+[a-c]+
+h[ae]llo
+[a-z]+ing
+[0-9]+
+x[a-f0-9]+y
+[a-cx-z]
+[é-ü]+
+caf[éè]
+t[h]e
+[-a]b
+a[b-]c
+.+ing
+.?ove

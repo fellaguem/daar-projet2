@@ -13,9 +13,6 @@ import java.util.List;
 // le score d'un livre est la somme des occurrences de ces mots dans le livre.
 public final class RechercheIndex {
 
-    // livre = numéro du livre dans l'index (pas l'identifiant Gutenberg)
-    public record Resultat(int livre, int occurrences) {}
-
     private final Index index;
 
     public RechercheIndex(Index index) {

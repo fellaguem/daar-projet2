@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import index.Index;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import recherche.RechercheIndex.Resultat;
 
 class RechercheIndexTest {
 

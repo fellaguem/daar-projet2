@@ -8,8 +8,17 @@ public class Determinisation {
     // Cette classe permet de transformer notre AFN epsilon en AFD avec la methode des sous ensembles
     private final Afn afn;
 
+    // nombre maximal d'etats de l'AFD (pas de limite par defaut)
+    private final int etatsMax;
+
     public Determinisation(Afn afn) {
+        this(afn, Integer.MAX_VALUE);
+    }
+
+    // avec une limite : AutomateTropGrandException si l'AFD depasse etatsMax etats
+    public Determinisation(Afn afn, int etatsMax) {
         this.afn = afn;
+        this.etatsMax = etatsMax;
     }
 
     // fermeture epsilon : recuperer tout les etats accessibles sans lire de caractere
@@ -123,6 +132,10 @@ public class Determinisation {
 
                 // si cet ensemble n'existe pas encore on cree un nouvel etat AFD
                 if (!correspondance.containsKey(destAf)) {
+
+                    if (afd.getEtats().size() >= etatsMax) {
+                        throw new AutomateTropGrandException(etatsMax);
+                    }
 
                     Etat nvEtat = new Etat();
                     afd.ajouterEtat(nvEtat);
