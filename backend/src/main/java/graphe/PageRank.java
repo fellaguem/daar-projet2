@@ -22,7 +22,7 @@ public final class PageRank {
 
     public static final double AMORTISSEMENT_DEFAUT = 0.85;
     public static final double TOLERANCE_DEFAUT = 1e-10;
-    public static final int ITERATIONS_MAX_DEFAUT = 100;
+    public static final int ITERATIONS_MAX_DEFAUT = 200;
 
     private static final int MAGIE = 0x50475231; // "PGR1"
 

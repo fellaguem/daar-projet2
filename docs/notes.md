@@ -145,8 +145,23 @@ Choix :
   mot du vocabulaire qui vérifie la regex.
 
 Mesure sur les 20 livres de test (`data/test20`) : 71 959 mots différents, 191 597 postings,
-construction + sauvegarde 0,8 s, fichier de 2 Mo. À refaire sur le vrai corpus (estimation :
-environ 20 millions de postings, 150 à 200 Mo ; à mesurer).
+construction + sauvegarde 0,8 s, fichier de 2 Mo.
+
+Mesure sur le vrai corpus (13/11/2026, 1 900 livres, 794 Mo de texte, `-Xmx2g`, une seule exécution) :
+
+| | |
+|---|---|
+| Mots dans les livres (tokeniseur) | 145 024 292 (de 10 016 à 1 315 683 par livre, moyenne 76 329) |
+| Mots différents | 416 275 |
+| Postings (couples mot-livre) | 12 440 683 |
+| Construction | 21,5 s (lecture des fichiers comprise) |
+| Construction + sauvegarde | 21,9 s |
+| Fichier `data/index.bin` | 100 Mo |
+| Mémoire maximale du processus | 874 Mo (working set Windows) |
+
+L'estimation (environ 20 millions de postings, 150 à 200 Mo) était trop haute. Vérification à la main :
+« whale » est dans 285 livres ; en tête, Moby-Dick (1 244 occurrences), puis « The Cruise of the
+Cachalot » (342), un récit de chasse au cachalot.
 
 Tests : `IndexTest` (11), `RechercheIndexTest` (7), `TokeniseurTest` (6).
 
@@ -270,10 +285,121 @@ graphe non orienté : PageRank y est presque proportionnel au degré ; à discut
 
 Tests : JaccardTest (8), GrapheTest (7), PageRankTest (8), MetadonneesTest (1). Suite complète : 85 tests.
 
+### Premier calcul sur le vrai corpus (13/11/2026, 1 900 livres, réglages par défaut)
+
+1 804 050 paires. Mots : 185 698 partagés (un bit chacun), 227 559 dans un seul livre, 3 018 mots vides
+retirés (plus de 50 % des livres). Vecteurs de bits 44,1 Mo (95 ms), distances 1,7 s sur 12 cœurs,
+programme complet 4,0 s, mémoire maximale 371 Mo.
+Distances : min 0,0048, 1 % 0,784, 5 % 0,824, 25 % 0,876, médiane 0,911, 75 % 0,941, 95 % 0,966,
+max 0,998 (`data/mesures/distances_histogramme.csv`).
+
+Doublons que le filtre par titre a laissé passer (titres différents), retrouvés par Jaccard :
+Alice 11 / 928 « HTML Edition » (0,0048), A Personal Record / Some Reminiscences (0,043, le même livre de
+Conrad sous deux titres), Captains Courageous ×2 (0,060), Around the World in Eighty Days / « Junior
+Deluxe Edition » (0,076), The Survivors of the Chancellor ×2 (0,091), Clotelle ×2 (0,119), Jargon File
+2.9.10 / 4.0.0 (0,122). Puis des paires proches mais distinctes : Sonnets de Shakespeare (0,22), Beatrix
+Potter (0,23), deux éditions de l'Origine des espèces (0,33).
+
+Degré moyen 10 → seuil 0,7695, 9 500 arêtes, **1 127 livres isolés sur 1 900**, 1 199 composantes (la
+plus grande : 582 livres). PageRank : 100 itérations sans atteindre 1e-10 (écart final 6e-10), 24 ms.
+En tête : Monte-Cristo, Dombey and Son, Little Dorrit, David Copperfield… (des romans très longs).
+Corrélation PageRank / degré : 0,91.
+
+Autres seuils (fixés à la main) :
+
+| Seuil | Degré moyen | Livres isolés | Plus grande composante |
+|---|---|---|---|
+| 0,7695 | 10 | 1 127 | 582 |
+| 0,80 | 37 | 768 | 977 |
+| 0,83 | 120 | 474 | 1 309 |
+| 0,85 | 236 | 316 | 1 499 |
+| 0,87 | 413 | 188 | 1 692 |
+| 0,89 | 648 | 100 | 1 790 |
+| 0,91 | 933 | 38 | 1 860 |
+
+Cause : **biais de longueur**. Un livre long a un grand vocabulaire ; deux livres longs en partagent
+beaucoup, alors qu'un livre court comparé à un long a une petite intersection et une grande union.
+Au seuil 0,7695 :
+
+| Longueur (mots) | Livres | Isolés | Degré moyen |
+|---|---|---|---|
+| 10 000 à 25 000 | 353 | 90 % | 0,1 |
+| 25 000 à 50 000 | 458 | 87 % | 0,2 |
+| 50 000 à 100 000 | 657 | 56 % | 2,4 |
+| 100 000 à 200 000 | 342 | 11 % | 30,7 |
+| plus de 200 000 | 90 | 7 % | 75,2 |
+
+Médiane de longueur : 40 229 mots pour les isolés, 100 441 pour les autres. Avec ce graphe, PageRank
+mesure surtout la longueur du livre. Voisins de Moby-Dick : cinq romans de Dickens.
+
+### Doublons retirés (`corpus.RetraitDoublons`, 13/11/2026)
+
+Les 7 paires à distance < 0,13 (sur tous les mots) sont des éditions du même livre : on garde le plus
+petit identifiant. Retirés : 928 (Alice, édition HTML), 1316 (Some Reminiscences = A Personal Record),
+2225 (Captains Courageous), 2154 (Around the World, Junior Deluxe Edition), 1698 (Survivors of the
+Chancellor), 2095 (Clotelle), 817 (Jargon File 4.0, gardé 2.9.10). La paire suivante est à 0,22 (deux
+recueils différents des Sonnets) : le seuil 0,13 sépare nettement doublons et livres proches.
+Les fichiers sont déplacés dans `data/doublons/` (rien n'est supprimé), les livres retirés de
+`metadonnees.tsv` et ajoutés à `rejetes.tsv`. **Corpus final : 1 893 livres** (≥ 1 664).
+Index reconstruit : 415 869 mots, 12 390 627 postings, 100 Mo (55 s cette fois contre 22 s la première :
+une mesure isolée ne suffit pas, à répéter pour les courbes).
+
+### Empreinte : les K mots les plus fréquents de chaque livre (décision du point 5)
+
+Pour enlever le biais de longueur, chaque livre est représenté pour Jaccard par ses K mots non vides
+les plus fréquents (à égalité : ordre alphabétique). Tous les ensembles ont la même taille, la règle
+de l'énoncé ne change pas (distance de Jaccard, arête sous un seuil). Calculé depuis l'index
+(les occurrences y sont), sans nouveau fichier. `Jaccard(index, partMax, K)`, K = 0 : tous les mots.
+
+Comparaison (1 893 livres, degré moyen visé 10, mots vides à 50 %) :
+
+| K | Seuil | Livres isolés | Plus grande composante | Corrélation PageRank / longueur | Isolés < 25 000 mots |
+|---|---|---|---|---|---|
+| tous | 0,770 | 1 133 | 584 | 0,52 | 89 % |
+| 250 | 0,915 | **270** | 1 491 | **0,33** | 29 % |
+| 500 | 0,901 | 277 | 1 542 | 0,42 | 32 % |
+| 1 000 | 0,878 | 337 | 1 453 | 0,51 | 42 % |
+| 2 000 | 0,845 | 474 | 1 246 | 0,57 | 57 % |
+
+Avec moins de mots vides (seuil à 20 % ou 10 % des livres), le gain est faible : 277 à 320 isolés,
+corrélation 0,21 à 0,31. On garde 50 %, la même définition que pour le classement du moteur.
+Environ 270 livres (14 %) restent isolés quel que soit le réglage : des livres sans vrai voisin dans
+le corpus (une option à discuter si besoin : relier aussi chaque livre à son plus proche voisin).
+
+**Choix : K = 250** (`ConstructionGraphe.MOTS_PAR_LIVRE_DEFAUT`). Les voisins deviennent thématiques :
+
+| Livre | Tous les mots | K = 250 |
+|---|---|---|
+| Moby-Dick | Dombey and Son, Martin Chuzzlewit, Little Dorrit, David Copperfield, Bleak House | The Cruise of the Cachalot, Two Years Before the Mast, The Sea-Wolf, The Coral Island, The Mirror of the Sea |
+| Monte-Cristo | Ten Years Later, Little Dorrit, Dombey and Son, Nicholas Nickleby, Les Misérables | Les Trois Mousquetaires, Ten Years Later, Vingt ans après, The Mystery of Orcival |
+| Alice | (isolé) | Through the Looking-Glass |
+| David Copperfield | 5 Dickens | 5 Dickens |
+| L'Origine des espèces | autre édition, Life of Darwin ×2, Descent of Man | autre édition, Descent of Man, Darwin and Modern Science |
+
+Graphe final (K = 250) : 29 387 mots partagés, vecteurs de bits 7,0 Mo (contre 44 Mo), distances
+0,11 s (contre 1,7 s). Distances : min 0,127, 5 % 0,954, médiane 0,986, 95 % 0,998. Seuil 0,9154,
+8 823 arêtes, degré moyen 9,32 (des égalités au seuil), 270 isolés, 311 composantes, la plus grande
+1 491 livres. PageRank : 107 itérations (limite passée de 100 à 200), 37 ms. Corrélation PageRank /
+degré 0,82. En tête : Gutenberg Encyclopedia vol. 1, Bulchevy's Book of English Verse, Critical and
+Historical Essays : des recueils variés, au centre du graphe, ce qui est attendu pour une centralité.
+
+### Serveur sur le vrai corpus (13/11/2026)
+
+Démarrage 6,9 s, 297 Mo en mémoire. « whale » : 282 livres ; `produit` : Moby-Dick, Cruise of the
+Cachalot, South Sea Tales ; suggestions : Adventure, Two Years Before the Mast, The Mirror of the Sea,
+The Sea-Wolf… `pagerank` met en tête des livres qui ne citent le mot qu'une à quatre fois (l'encyclopédie) :
+c'est pour cela que le tri par défaut est le produit. Regex `wh(a|e)le` : 30 mots, 414 livres,
+759 ms au premier appel (à mesurer à chaud pour les courbes ; 14 à 22 ms sur test20).
+
 ### Téléchargement du corpus (lancé le 13/11/2026 à 01:08)
 
 Environ 5 livres gardés par minute (106 requêtes en 16,6 min, soit environ 9 s par livre avec la pause
 de 1,5 s) : le corpus complet demandera environ 6 h, et non 1 h 30 à 2 h comme estimé.
+
+Fin le 13/11/2026 à 05:06 (environ 4 h en tout, le rythme est monté à 7 livres par minute).
+1 900 livres gardés pour 2 120 téléchargements essayés ; 29 titres exclus et 125 doublons écartés avant
+téléchargement. Rejetés après téléchargement (`data/rejetes.tsv`) : 214 trop courts, 5 fichiers absents
+(404), 1 sans en-tête Gutenberg reconnu. Corpus : 794 Mo de texte, `metadonnees.tsv` de 237 Ko.
 
 ## Moteur et API réelle (`recherche.Moteur`, `api.*`)
 

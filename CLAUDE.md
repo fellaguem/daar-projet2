@@ -108,7 +108,10 @@ Le projet 1 (clone d'`egrep` en Java) fournit les packages `parser`, `ast`, `aut
    présents dans une grande part des livres) sont retirés du graphe de Jaccard et du classement.
    Recherche à plusieurs mots : les livres qui contiennent tous les mots (ET), score = somme des occurrences.
 3. Graphe de Jaccard : distance de Jaccard entre les ensembles de mots des livres, arête si la distance est
-   sous un seuil. Environ 1,4 million de paires : tester d'abord sur 100 livres. Sauvegarder la liste d'arêtes.
+   sous un seuil. Chaque livre est représenté par son empreinte, ses 250 mots non vides les plus fréquents
+   (sinon le graphe ne reflète que la longueur des livres, voir `docs/notes.md`). Environ 1,8 million de
+   paires. Sauvegarder la liste d'arêtes. Les doublons à titres différents (distance < 0,13 sur tous les
+   mots) sont retirés avant, par `corpus.RetraitDoublons`.
 4. PageRank sur ce graphe, précalculé et sauvegardé.
 
 ## Règles

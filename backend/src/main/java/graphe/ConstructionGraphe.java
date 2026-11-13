@@ -16,7 +16,10 @@ import java.util.PriorityQueue;
 //
 //   java -cp backend/target/classes graphe.ConstructionGraphe --dossier data
 //        [--index DOSSIER/index.bin] [--metadonnees DOSSIER/metadonnees.tsv]
-//        [--part-max 0.5] [--degre-moyen 10 | --seuil 0.8] [--amortissement 0.85]
+//        [--part-max 0.5] [--mots-par-livre 250] [--degre-moyen 10 | --seuil 0.8] [--amortissement 0.85]
+//
+// --mots-par-livre K : chaque livre est représenté par ses K mots non vides les plus fréquents
+// (0 = tous ses mots). Voir Jaccard et docs/notes.md (biais de longueur).
 //
 // Fichiers écrits dans le dossier :
 //   graphe.bin, pagerank.bin                  lus par le serveur
@@ -24,11 +27,15 @@ import java.util.PriorityQueue;
 //   mesures/distances_histogramme.csv         histogramme des distances (classes de 0,05)
 public class ConstructionGraphe {
 
+    // choisi sur le vrai corpus le 13/11/2026 (docs/notes.md) : 250 mots les plus fréquents par livre
+    public static final int MOTS_PAR_LIVRE_DEFAUT = 250;
+
     public static void main(String[] args) throws IOException {
         Path dossier = Path.of("data");
         Path fichierIndex = null;
         Path fichierMeta = null;
         double partMax = Jaccard.PART_MAX_DEFAUT;
+        int motsParLivre = MOTS_PAR_LIVRE_DEFAUT;
         double degreMoyen = 10;
         Double seuilFixe = null;
         double amortissement = PageRank.AMORTISSEMENT_DEFAUT;
@@ -39,6 +46,7 @@ public class ConstructionGraphe {
                 case "--index" -> fichierIndex = Path.of(args[++i]);
                 case "--metadonnees" -> fichierMeta = Path.of(args[++i]);
                 case "--part-max" -> partMax = Double.parseDouble(args[++i]);
+                case "--mots-par-livre" -> motsParLivre = Integer.parseInt(args[++i]);
                 case "--degre-moyen" -> degreMoyen = Double.parseDouble(args[++i]);
                 case "--seuil" -> seuilFixe = Double.parseDouble(args[++i]);
                 case "--amortissement" -> amortissement = Double.parseDouble(args[++i]);
@@ -65,13 +73,27 @@ public class ConstructionGraphe {
         }
 
         long t0 = System.nanoTime();
-        Jaccard jaccard = new Jaccard(index, partMax);
+        Jaccard jaccard = new Jaccard(index, partMax, motsParLivre);
         long t1 = System.nanoTime();
         float[] dist = jaccard.toutesLesDistances();
         long t2 = System.nanoTime();
 
         System.out.printf(Locale.ROOT, "Livres : %d, paires : %d%n", n, dist.length);
-        System.out.printf(Locale.ROOT, "Mots : %d partagés (un bit chacun), %d présents dans un seul livre, "
+        int tailleMin = Integer.MAX_VALUE;
+        int tailleMax = 0;
+        int incomplets = 0;
+        for (int i = 0; i < n; i++) {
+            tailleMin = Math.min(tailleMin, jaccard.taille(i));
+            tailleMax = Math.max(tailleMax, jaccard.taille(i));
+            if (motsParLivre > 0 && jaccard.taille(i) < motsParLivre) {
+                incomplets++;
+            }
+        }
+        System.out.printf(Locale.ROOT, "Ensembles : %s, tailles de %d à %d mots%s%n",
+            motsParLivre > 0 ? "les " + motsParLivre + " mots les plus fréquents de chaque livre" : "tous les mots",
+            n == 0 ? 0 : tailleMin, tailleMax,
+            incomplets > 0 ? " (" + incomplets + " livres ont moins de " + motsParLivre + " mots)" : "");
+        System.out.printf(Locale.ROOT, "Mots : %d partagés (un bit chacun), %d dans l'ensemble d'un seul livre, "
             + "%d mots vides retirés (dans plus de %.0f %% des livres)%n",
             jaccard.nbMotsPartages(), jaccard.nbMotsUniques(), jaccard.nbMotsVides(), partMax * 100);
         System.out.printf(Locale.ROOT, "Vecteurs de bits : %.1f Mo, construits en %d ms%n",
@@ -106,12 +128,18 @@ public class ConstructionGraphe {
         afficherMeilleurs(graphe, pr.scores(), meta, 10);
 
         // corrélation avec le degré : sur un graphe non orienté, PageRank est souvent proche du degré
+        // et avec la longueur du livre : mesure le biais de longueur du graphe
         double[] degres = new double[n];
+        double[] longueurs = new double[n];
         for (int i = 0; i < n; i++) {
             degres[i] = graphe.degre(i);
+            longueurs[i] = index.longueurLivre(i);
         }
         System.out.printf(Locale.ROOT, "Corrélation (Pearson) entre PageRank et degré : %.4f%n",
             pearson(pr.scores(), degres));
+        System.out.printf(Locale.ROOT, "Corrélation (Pearson) entre PageRank et longueur du livre : %.4f%n",
+            pearson(pr.scores(), longueurs));
+        afficherIsolesParLongueur(graphe, longueurs);
 
         // ---------- fichiers ----------
         graphe.sauver(dossier.resolve("graphe.bin"));
@@ -202,6 +230,31 @@ public class ConstructionGraphe {
                 Metadonnees.Livre l = meta == null ? null : meta.livre(g.idLivre(i));
                 String titre = l == null ? "" : l.titre().replace("\"", "\"\"");
                 out.printf(Locale.ROOT, "%d,%d,%.10f,\"%s\"%n", g.idLivre(i), g.degre(i), scores[i], titre);
+            }
+        }
+    }
+
+    // part de livres isolés et degré moyen par tranche de longueur (en mots indexés)
+    private static void afficherIsolesParLongueur(Graphe g, double[] longueurs) {
+        int[] bornes = {0, 25_000, 50_000, 100_000, 200_000, Integer.MAX_VALUE};
+        System.out.println("Par longueur (mots indexés) :");
+        for (int t = 0; t + 1 < bornes.length; t++) {
+            int nb = 0;
+            int isoles = 0;
+            long degres = 0;
+            for (int i = 0; i < g.nbSommets(); i++) {
+                if (longueurs[i] >= bornes[t] && longueurs[i] < bornes[t + 1]) {
+                    nb++;
+                    degres += g.degre(i);
+                    if (g.degre(i) == 0) {
+                        isoles++;
+                    }
+                }
+            }
+            if (nb > 0) {
+                System.out.printf(Locale.ROOT, "  %7d à %-10s : %4d livres, %5.1f %% isolés, degré moyen %.1f%n",
+                    bornes[t], bornes[t + 1] == Integer.MAX_VALUE ? "plus" : String.valueOf(bornes[t + 1]),
+                    nb, 100.0 * isoles / nb, (double) degres / nb);
             }
         }
     }
