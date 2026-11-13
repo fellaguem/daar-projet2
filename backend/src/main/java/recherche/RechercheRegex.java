@@ -29,7 +29,7 @@ public final class RechercheRegex {
     public static final int ETATS_MAX = 2000;
 
     // regex vide, trop longue, mal écrite ou qui accepte le mot vide : le message est montré à l'utilisateur
-    public static class RegexInvalide extends RuntimeException {
+    public static class RegexInvalide extends RequeteInvalide {
         public RegexInvalide(String message) {
             super(message);
         }
@@ -37,8 +37,10 @@ public final class RechercheRegex {
 
     // resultats : livres triés par occurrences décroissantes ;
     // motsTrouves : les MOTS_RENVOYES premiers mots trouvés (ordre alphabétique) ;
-    // nbMotsTrouves : le nombre total de mots du vocabulaire qui vérifient la regex
-    public record Reponse(List<Resultat> resultats, int nbMotsTrouves, List<String> motsTrouves) {}
+    // nbMotsTrouves : le nombre total de mots du vocabulaire qui vérifient la regex ;
+    // numerosMots : les numéros (dans l'index) de tous les mots trouvés, pour le classement
+    public record Reponse(List<Resultat> resultats, int nbMotsTrouves, List<String> motsTrouves,
+                          List<Integer> numerosMots) {}
 
     private final Index index;
 
@@ -78,7 +80,7 @@ public final class RechercheRegex {
         for (int i = 0; i < Math.min(MOTS_RENVOYES, mots.size()); i++) {
             premiers.add(index.mot(mots.get(i)));
         }
-        return new Reponse(resultats, mots.size(), premiers);
+        return new Reponse(resultats, mots.size(), premiers, mots);
     }
 
     // regex -> AFD minimal de ".*regex" (recherche d'une sous-chaîne)
