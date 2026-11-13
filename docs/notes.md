@@ -149,3 +149,128 @@ construction + sauvegarde 0,8 s, fichier de 2 Mo. À refaire sur le vrai corpus 
 environ 20 millions de postings, 150 à 200 Mo ; à mesurer).
 
 Tests : `IndexTest` (11), `RechercheIndexTest` (7), `TokeniseurTest` (6).
+
+## Recherche avancée par regex, mode index (`recherche.RechercheRegex`)
+
+Principe : regex minuscule -> `Parser` -> `MatcherUnePasse.envelopper` (`.*R`, donc recherche d'une
+sous-chaîne comme egrep) -> AFD minimal (projet 1) -> test sur chaque mot du vocabulaire -> union des
+livres de ces mots (OU), score = somme des occurrences des mots trouvés. Réponse : livres triés,
+nombre de mots trouvés, 50 premiers mots (ordre alphabétique).
+
+Refusées avec un message (RegexInvalide, code 400 côté API) : regex vide, plus de 100 caractères,
+mal écrite, qui accepte le mot vide (`a*`, `a|`, `(a|b)*` : elle trouverait tous les livres), ou dont
+l'AFD dépasse 2 000 états.
+
+### Explosion du nombre d'états (mesures du 13/11/2026)
+
+Regex `a` suivie de k points, automate de `.*a.{k}` : l'AFD a 2^(k+1) états.
+
+| k | états (AFD) | construction |
+|---|---|---|
+| 9 | 1 025 | 47 ms |
+| 10 | 2 049 | 124 ms |
+| 11 | 4 097 | 379 ms |
+| 12 | 8 193 | 1,4 s |
+| 13 | 16 385 | 5,8 s |
+| 14 | 32 769 | 27 s |
+
+Le nombre d'états double à chaque point, et le temps est ensuite multiplié par 4 à chaque doublement
+(la minimisation de Moore du projet 1 est quadratique : `indicePartition` parcourt toutes les
+partitions). Une regex de 100 caractères comme `a` + 99 points ne finirait jamais (2^100 états) :
+d'où la limite de 2 000 états (environ 0,1 s dans le pire cas), appliquée par un paramètre
+optionnel de `Determinisation` et `ConstructionAutomate` (pas de limite par défaut, le projet 1
+se comporte comme avant). À discuter dans le rapport : le blow-up exponentiel de la
+déterminisation est le point faible connu de l'approche AFD ; un NFA simulé évite l'explosion
+mais coûte plus par caractère.
+
+### Temps mesurés sur les 20 livres de test
+
+`recherche.MesureRegex` (3 appels de chauffe, 10 essais, moyenne ± écart type), fichier
+`data/test20/mesures/regex_index.csv`. Index : 20 livres, 71 959 mots, 191 597 postings.
+
+| regex | temps (ms) | mots trouvés | livres |
+|---|---|---|---|
+| `whale` | 22,0 ± 4,9 | 13 | 10 |
+| `wh(a\|e)le` | 17,4 ± 1,0 | 13 | 10 |
+| `s(a\|g\|r)*on` | 19,7 ± 2,7 | 268 | 20 |
+| `a.*b` | 14,3 ± 1,2 | 3 034 | 20 |
+| `.*ing` | 18,5 ± 3,0 | 4 360 | 20 |
+| `(sh\|wh)(a\|o)(l\|r)(e\|k)` | 20,9 ± 1,8 | 56 | 19 |
+| `q.*z` | 16,3 ± 4,0 | 36 | 12 |
+
+Le temps est dominé par le parcours du vocabulaire (environ 0,25 µs par mot) et ne dépend presque pas
+de la regex. À refaire sur le vrai corpus (vocabulaire plus grand).
+Pour comparaison, le texte complet des 20 livres (21,4 millions de caractères) prend 824 ms pour
+`wh(a|e)le` avec le projet 1 tel quel, soit 39 ns par caractère.
+
+## Projet 1 étendu (modifications du code copié dans backend/)
+
+1. `Determinisation` et `ConstructionAutomate` : constructeur avec limite `etatsMax` sur le nombre
+   d'états de l'AFD (nouvelle classe `AutomateTropGrandException`). Les anciens constructeurs n'ont
+   pas de limite : comportement inchangé.
+2. `Parser` : syntaxe étendue.
+   - `x+` devient `x x*` et `x?` devient `x | vide` (aucun nouveau noeud d'arbre ni nouvel automate).
+   - Classes de caractères `[abc]`, `[a-z]`, `[a-cx-z]`, `[é-ü]` : alternative `a|b|c`. Le `-` au début
+     ou à la fin est une lettre. Refusés : `[]`, `[^...]` (non géré), plage à l'envers, classe de plus
+     de 1 000 lettres, crochet non fermé.
+   - Changement de comportement : `+`, `?` et `[` étaient des lettres, ce sont maintenant des opérateurs.
+     `]` seul reste une lettre. `{ }` restent des lettres.
+   - Piège pour les tests : en Java, `a++`, `a*+` et `a?+` sont des quantificateurs possessifs, qui
+     n'ont pas le même sens ici (`(a+)+`). `input7.txt` évite ces enchaînements.
+
+Tests : `ParserTest` (11), `input7.txt` (24 regex) lu par les tests du projet 1 :
+`CorrectionProjet1Test` passe à 13 037 820 comparaisons (naïf, une passe et KMP contre java.util.regex),
+`AutomatesProjet1Test` à 5 954 280, toujours 0 erreur. `RechercheRegexTest` (10) compare, pour 48 regex,
+les mots trouvés et les totaux par livre à `java.util.regex` sur un index des 14 textes de test.
+Suite complète : 61 tests.
+
+## Graphe de Jaccard et PageRank (`graphe.Jaccard`, `graphe.Graphe`, `graphe.PageRank`, `graphe.ConstructionGraphe`)
+
+Distance : d(A, B) = 1 - |A ∩ B| / |A ∪ B| sur les ensembles de mots des livres, calculée depuis l'index.
+
+Mots pris en compte (décidé le 13/11/2026) :
+- mots vides retirés : mots présents dans plus de 50 % des livres (seuil automatique, pas de liste) ;
+- mots présents dans un seul livre gardés. Ils ne peuvent pas être dans une intersection : ils n'ont
+  pas de bit, ils sont seulement comptés dans la taille |A|. La distance est exactement celle des
+  ensembles complets (vérifié par `JaccardTest` contre un calcul avec des `HashSet`, sur les 14 textes
+  du projet 1 et sur 20 petits corpus aléatoires), avec des vecteurs de bits bien plus petits.
+  Effet à discuter : un livre plein de mots rares est plus loin de tous les autres.
+- deux livres sans aucun mot gardé ont une distance de 1 (pas d'information).
+
+Calcul : un vecteur de bits (long[]) par livre sur les mots partagés ; |A ∩ B| = bitCount(A ET B),
+|A ∪ B| = |A| + |B| - |A ∩ B|. Les n(n-1)/2 distances sont calculées en parallèle (une ligne par tâche)
+et gardées en float (7 Mo pour 1 900 livres) pour l'histogramme et le choix du seuil.
+
+Graphe : arête si d < seuil (strictement). Seuil donné (`--seuil`) ou déduit d'un degré moyen visé
+(`--degre-moyen`, 10 par défaut) : on garde les degré * n / 2 plus petites distances. Rangé en tableaux
+(debut[], voisins[], distances[]), voisins triés du plus proche au plus loin (utile pour les suggestions).
+Fichiers : graphe.bin, aretes.csv (liste d'arêtes), pagerank.bin, pagerank.csv, mesures/distances_histogramme.csv.
+
+PageRank : classique (non pondéré), itération de la puissance, amortissement 0,85, arrêt quand la somme
+des |PR' - PR| < 1e-10 (100 itérations au plus). Le score des livres isolés est redistribué
+uniformément à tous les livres (la somme reste 1). Vérifié par `PageRankTest` : cycle uniforme, centre
+d'étoile, formule exacte avec un isolé (y = (1-a)/(3-a)), et calcul matriciel naïf sur 30 graphes
+aléatoires (écart < 1e-10). Version pondérée par la similarité : bonus, si on a le temps.
+
+Point ouvert (à décider après l'histogramme du vrai corpus) : livres isolés acceptés tels quels, ou
+garantir à chaque livre ses 3 plus proches voisins.
+
+### Essai sur les 20 livres de test (pas une calibration)
+
+20 livres, 190 paires. Mots : 35 885 partagés, 33 285 présents dans un seul livre, 2 789 mots vides.
+Vecteurs de bits 0,1 Mo (8 ms), distances 14 ms.
+Distances : min 0,0018, 5 % 0,83, médiane 0,94, 95 % 0,998, moyenne 0,92 : presque toutes entre 0,8
+et 1 (histogramme : 177 paires sur 190 au-dessus de 0,85).
+Paires les plus proches : les doublons que le filtre par titre n'avait pas encore (ce test date d'avant
+le filtre) : les deux Bibles (0,0018), les deux CIA World Factbook (0,17), les deux Paradise Lost (0,47).
+Puis Alice et De l'autre côté du miroir (0,82) : Jaccard retrouve bien les livres proches.
+Degré moyen visé 10 -> seuil 0,9417, 100 arêtes, 1 isolé (le recensement de 1990, liste de chiffres),
+2 composantes. PageRank : 22 itérations, 2 ms. Corrélation PageRank / degré : 0,998 (attendu sur un
+graphe non orienté : PageRank y est presque proportionnel au degré ; à discuter dans le rapport).
+
+Tests : JaccardTest (8), GrapheTest (7), PageRankTest (8), MetadonneesTest (1). Suite complète : 85 tests.
+
+### Téléchargement du corpus (lancé le 13/11/2026 à 01:08)
+
+Environ 5 livres gardés par minute (106 requêtes en 16,6 min, soit environ 9 s par livre avec la pause
+de 1,5 s) : le corpus complet demandera environ 6 h, et non 1 h 30 à 2 h comme estimé.

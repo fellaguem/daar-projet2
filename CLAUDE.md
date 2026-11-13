@@ -3,6 +3,8 @@
 Binôme : Moustafa FELLAGUE et Younes MANSOUS (Master 2 STL, Sorbonne Université).
 Rendu : 22 novembre 2026, 23h59, sur Moodle (vidéo pitch de 5 min avec démo, pas de présentation orale).
 
+**Au début de chaque session, lire `docs/reprise.md`** (décisions prises, points ouverts, plan du jour).
+
 ## Objectif
 
 Application web de recherche de livres dans une bibliothèque de documents au format texte.
@@ -77,7 +79,8 @@ Réponse d'une recherche (les suggestions sont incluses, le front ne fait qu'un 
 }
 ```
 
-`type` vaut `motcle` ou `regex`. `GET /api/books/{id}` renvoie
+`type` vaut `motcle` ou `regex` ; pour `regex` la réponse a aussi `nbMotsTrouves` et `motsTrouves`, et une requête refusée
+renvoie 400 `{ "erreur": "..." }` (voir `docs/api.md`). `GET /api/books/{id}` renvoie
 `{ id, titre, auteur, urlSource, extrait, voisins: [{ id, titre, auteur }] }`.
 
 ## Réutilisation du projet 1
@@ -90,7 +93,7 @@ Le projet 1 (clone d'`egrep` en Java) fournit les packages `parser`, `ast`, `aut
 - Le projet 1 copié dans `backend/` peut être modifié (compter les occurrences, étendre le parseur avec
   `+ ? [..]`), mais les tests du projet 1 (`backend/src/test/java/projet1`) doivent rester verts, et chaque
   changement est noté dans `docs/notes.md` (« projet 1 étendu »).
-- Limite connue : la regex ne gère que `( ) | * .` et les lettres.
+- Syntaxe des regex : `( ) | * + ? .`, les classes `[abc]` et `[a-z]` (pas de `[^...]`), et les lettres.
 
 ## Pipeline de données (hors ligne, lancé une fois)
 
