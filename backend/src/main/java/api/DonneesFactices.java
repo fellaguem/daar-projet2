@@ -17,7 +17,10 @@ final class DonneesFactices {
         new Dto.Suggestion(10712, "The Cruise of the Cachalot", "Frank T. Bullen"));
 
     static Dto.ReponseRecherche reponse(String requete, String type) {
-        return new Dto.ReponseRecherche(requete, type, 12, RESULTATS, SUGGESTIONS);
+        boolean regex = type.equals("regex");
+        return new Dto.ReponseRecherche(requete, type, 12, RESULTATS, SUGGESTIONS,
+            regex ? 3 : null,
+            regex ? List.of("whale", "whaleboat", "whaler") : null);
     }
 
     static Dto.Livre livre(int id) {

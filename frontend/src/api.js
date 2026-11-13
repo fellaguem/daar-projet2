@@ -8,7 +8,10 @@ const SUGGESTIONS = [
 ]
 
 function reponseFactice(requete, type) {
+  // pour une regex, l'API ajoute nbMotsTrouves et motsTrouves
+  const regex = type === 'regex' ? { nbMotsTrouves: 3, motsTrouves: ['whale', 'whaleboat', 'whaler'] } : {}
   return {
+    ...regex,
     requete,
     type,
     tempsMs: 12,
