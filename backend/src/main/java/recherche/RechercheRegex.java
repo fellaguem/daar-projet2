@@ -15,7 +15,8 @@ import parser.Parser;
 // Recherche avancée par RegEx, dans l'index.
 //
 // La regex est testée sur chaque mot du vocabulaire (jamais sur les livres) avec l'AFD minimal
-// du projet 1. Un mot "vérifie" la regex s'il en contient une occurrence (comme egrep) :
+// du projet 1, recopié dans un tableau (MatcherTable). Un mot "vérifie" la regex s'il en contient
+// une occurrence (comme egrep) :
 // "whal" trouve "whale" et "whaleboat".
 // Un livre est retenu s'il contient au moins un mot trouvé (OU) ; son score est la somme
 // des occurrences des mots trouvés dans ce livre.
@@ -50,7 +51,7 @@ public final class RechercheRegex {
 
     public Reponse chercher(String regex) {
         Afd automate = construireAutomate(regex);
-        MatcherUnePasse matcher = new MatcherUnePasse(automate);
+        MatcherTable matcher = new MatcherTable(automate); // même résultat que MatcherUnePasse, plus rapide
 
         // 1. les mots du vocabulaire qui vérifient la regex
         List<Integer> mots = new ArrayList<>();

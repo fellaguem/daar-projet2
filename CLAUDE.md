@@ -90,7 +90,8 @@ Lancer le serveur sur les données de test : `--moteur.dossier=data/test20` (par
 
 Le projet 1 (clone d'`egrep` en Java) fournit les packages `parser`, `ast`, `automate`, `kmp` et `experimentation`.
 
-- Recherche avancée : l'AFD minimal du projet 1 (`MatcherUnePasse`) est testé sur chaque mot de l'index.
+- Recherche avancée : l'AFD minimal du projet 1 est testé sur chaque mot de l'index, recopié dans un
+  tableau par `recherche.MatcherTable` (mêmes réponses que `MatcherUnePasse`, 4 fois plus rapide).
 - Recherche par mot-clef : recherche exacte dans l'index (dichotomie sur le vocabulaire), pas `Kmp`.
   `Kmp` sert pour les extraits et pour la variante « texte complet » de la recherche avancée.
 - Le projet 1 copié dans `backend/` peut être modifié (compter les occurrences, étendre le parseur avec

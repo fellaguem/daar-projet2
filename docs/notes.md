@@ -214,9 +214,35 @@ mais coûte plus par caractère.
 | `q.*z` | 16,3 ± 4,0 | 36 | 12 |
 
 Le temps est dominé par le parcours du vocabulaire (environ 0,25 µs par mot) et ne dépend presque pas
-de la regex. À refaire sur le vrai corpus (vocabulaire plus grand).
+de la regex.
 Pour comparaison, le texte complet des 20 livres (21,4 millions de caractères) prend 824 ms pour
 `wh(a|e)le` avec le projet 1 tel quel, soit 39 ns par caractère.
+
+### Sur le vrai corpus, et AFD recopié dans un tableau (`recherche.MatcherTable`, 13/11/2026)
+
+Index : 1 893 livres, 415 869 mots. Avec `MatcherUnePasse` (projet 1 tel quel) : 106 à 152 ms par
+requête, écart type 15 à 53 ms, quelle que soit la regex. Cause : pour chaque caractère,
+`Afd.suivant` crée une chaîne, cherche dans un `TreeSet`, puis dans deux `HashMap` et un `HashSet`.
+
+`MatcherTable` recopie l'AFD minimal, une fois par requête, dans un tableau (état, caractère) → état
+suivant (une colonne par symbole de l'alphabet, une pour AUTRE ; -1 = pas de transition). Le parcours
+d'un mot ne lit plus qu'une case par caractère. Le projet 1 n'est pas modifié (classe à côté).
+`MatcherTableTest` vérifie les mêmes réponses que `MatcherUnePasse` sur 20 regex (avec et sans
+enveloppe `.*`) et plus de 10 000 mots (textes du projet 1 et mots au hasard avec accents, chiffres,
+ponctuation).
+
+| regex | `MatcherUnePasse` (ms) | `MatcherTable` (ms) | mots trouvés | livres |
+|---|---|---|---|---|
+| `whale` | 151,5 ± 53,1 | 37,6 ± 5,9 | 27 | 410 |
+| `wh(a\|e)le` | 150,3 ± 43,4 | 34,6 ± 8,0 | 30 | 414 |
+| `s(a\|g\|r)*on` | 149,5 ± 43,9 | 40,3 ± 7,4 | 2 294 | 1 893 |
+| `a.*b` | 133,4 ± 31,0 | 38,9 ± 6,1 | 17 231 | 1 893 |
+| `.*ing` | 138,2 ± 31,0 | 36,0 ± 2,7 | 18 850 | 1 893 |
+| `(sh\|wh)(a\|o)(l\|r)(e\|k)` | 141,1 ± 25,4 | 31,4 ± 2,3 | 192 | 1 889 |
+| `q.*z` | 106,3 ± 14,9 | 32,4 ± 6,5 | 146 | 1 062 |
+
+Environ 4 fois plus rapide. 10 essais après 3 appels de chauffe, une seule exécution du programme
+(`data/mesures/regex_index.csv`).
 
 ## Projet 1 étendu (modifications du code copié dans backend/)
 
@@ -282,6 +308,10 @@ Puis Alice et De l'autre côté du miroir (0,82) : Jaccard retrouve bien les liv
 Degré moyen visé 10 -> seuil 0,9417, 100 arêtes, 1 isolé (le recensement de 1990, liste de chiffres),
 2 composantes. PageRank : 22 itérations, 2 ms. Corrélation PageRank / degré : 0,998 (attendu sur un
 graphe non orienté : PageRank y est presque proportionnel au degré ; à discuter dans le rapport).
+
+Graphe de test20 refait le 13/11/2026 avec l'empreinte de 250 mots (livres et index inchangés, les
+doublons y sont gardés exprès) : Bibles 0,00, Factbooks 0,14, Paradise Lost 0,62, Alice / Miroir 0,83.
+Seuil 0,9879 pour un degré moyen de 10 (avec 20 livres, la moitié des paires), 93 arêtes, aucun isolé.
 
 Tests : JaccardTest (8), GrapheTest (7), PageRankTest (8), MetadonneesTest (1). Suite complète : 85 tests.
 
