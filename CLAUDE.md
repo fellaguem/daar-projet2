@@ -58,20 +58,21 @@ daar-projet2/
 ## Contrat d'API
 
 ```
-GET /api/search?q=whale                               recherche par mot-clef
-GET /api/search/advanced?regex=wh(a|e)le&mode=index   mode = index | texte
-GET /api/books/{id}                                   page d'un livre
+GET /api/search?q=whale&tri=produit                               recherche par mot-clef
+GET /api/search/advanced?regex=wh(a|e)le&mode=index&tri=produit   mode = index | texte
+GET /api/books/{id}                                               page d'un livre
 ```
 
-Réponse d'une recherche (les suggestions sont incluses, le front ne fait qu'un appel) :
+`tri` = `produit` (défaut, score), `occurrences` ou `pagerank`. Réponse d'une recherche (les suggestions sont
+incluses, le front ne fait qu'un appel ; tous les résultats sont renvoyés, le front pagine) :
 
 ```json
 {
   "requete": "whale",
   "type": "motcle",
-  "tempsMs": 12,
+  "tempsMs": 3.95,
   "resultats": [
-    { "id": 123, "titre": "…", "auteur": "…", "occurrences": 42, "pagerank": 0.0021 }
+    { "id": 123, "titre": "…", "auteur": "…", "occurrences": 42, "pagerank": 0.0021, "score": 0.00042 }
   ],
   "suggestions": [
     { "id": 456, "titre": "…", "auteur": "…" }
@@ -79,9 +80,11 @@ Réponse d'une recherche (les suggestions sont incluses, le front ne fait qu'un 
 }
 ```
 
-`type` vaut `motcle` ou `regex` ; pour `regex` la réponse a aussi `nbMotsTrouves` et `motsTrouves`, et une requête refusée
-renvoie 400 `{ "erreur": "..." }` (voir `docs/api.md`). `GET /api/books/{id}` renvoie
+`type` vaut `motcle` ou `regex` ; pour `regex` la réponse a aussi `nbMotsTrouves` et `motsTrouves`.
+`score` = (occurrences des mots non vides / nombre de mots du livre) × pagerank. Une requête refusée renvoie
+400 `{ "erreur": "..." }`, un livre inconnu 404 (voir `docs/api.md`). `GET /api/books/{id}` renvoie
 `{ id, titre, auteur, urlSource, extrait, voisins: [{ id, titre, auteur }] }`.
+Lancer le serveur sur les données de test : `--moteur.dossier=data/test20` (par défaut `data`).
 
 ## Réutilisation du projet 1
 

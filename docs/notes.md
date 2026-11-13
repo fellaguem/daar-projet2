@@ -274,3 +274,37 @@ Tests : JaccardTest (8), GrapheTest (7), PageRankTest (8), MetadonneesTest (1). 
 
 Environ 5 livres gardés par minute (106 requêtes en 16,6 min, soit environ 9 s par livre avec la pause
 de 1,5 s) : le corpus complet demandera environ 6 h, et non 1 h 30 à 2 h comme estimé.
+
+## Moteur et API réelle (`recherche.Moteur`, `api.*`)
+
+`Moteur` charge au démarrage, depuis un dossier (`moteur.dossier`, `data` par défaut) : index.bin, graphe.bin,
+pagerank.bin, metadonnees.tsv et livres/. Il vérifie que l'index, le graphe et le PageRank contiennent les mêmes
+livres dans le même ordre (sinon le serveur refuse de démarrer). Ensuite tout est en lecture seule : plusieurs
+clients en même temps sans verrou (testé : 200 requêtes sur 16 fils, mêmes réponses qu'en séquentiel).
+
+Classement (décidé le 13/11/2026) :
+- score = (occurrences des mots non vides / nombre de mots du livre) × PageRank ;
+- mots vides = mots présents dans plus de 50 % des livres (même seuil que Jaccard) : gardés dans la recherche
+  (ET pour un mot-clef), ignorés dans le score ; si tous les mots de la requête sont vides, ils comptent tous ;
+- pour une regex, mêmes règles sur les mots trouvés ;
+- paramètre `tri` pour comparer les classements dans le rapport : `produit` (défaut), `occurrences`
+  (occurrences totales, le critère simple de l'énoncé), `pagerank`. Le champ `score` est toujours renvoyé.
+
+Suggestions : voisins de Jaccard des 3 premiers résultats (selon le tri), sans ces 3 livres, triés par distance
+au plus proche des 3, 10 au plus. Choix : on n'exclut que les 3 premiers et pas tous les résultats, sinon un mot
+courant (présent dans presque tous les livres) ne laisserait aucune suggestion.
+
+Tous les résultats sont renvoyés (le front pagine). `tempsMs` = temps du moteur seul (recherche, classement,
+suggestions), sans réseau ni JSON, en ms avec 2 décimales.
+
+Erreurs : 400 `{ "erreur": "..." }` (requête vide, regex invalide, tri ou mode inconnu, mode texte pas encore
+disponible), 404 (livre inconnu). `DonneesFactices.java` supprimé ; le mode données factices reste dans le front.
+
+Essai sur data/test20 (serveur réel) : « white whale » -> 5 livres en 3,95 ms, Moby-Dick en tête
+(1 526 occurrences, score 4,2e-4, loin devant). Les trois tris donnent des ordres différents :
+produit 15, 22, 17, 10 ; occurrences 15, 10, 30, 22 ; pagerank 15, 10, 17, 30.
+Regex `wh(a|e)les?` : 13 mots (dont narwhale), 10 livres, 67 ms au premier appel (JVM pas encore chauffée).
+Page d'Alice (11) : premier voisin Through the Looking-Glass (12).
+
+Tests : MoteurTest (13, sur un corpus de 6 livres construit comme le vrai), ApiTest (6, serveur réel sur un port
+libre : contrat JSON, tris, suggestions, 400/404, 200 requêtes simultanées). Suite complète : 104 tests.
