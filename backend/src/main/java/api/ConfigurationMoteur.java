@@ -15,6 +15,7 @@ import recherche.Moteur;
 // à changer au lancement avec --moteur.dossier=data/test20 par exemple.
 // Si le serveur est lancé depuis backend/ (mvnw spring-boot:run), on cherche aussi dans ../
 // Un fichier manquant arrête le démarrage avec un message clair.
+// Le moteur est "chauffé" (Moteur.chauffer) avant que le serveur accepte des requêtes.
 @Configuration
 public class ConfigurationMoteur {
 
@@ -32,6 +33,9 @@ public class ConfigurationMoteur {
         Moteur moteur = Moteur.charger(chemin);
         LOG.info("Moteur chargé depuis {} : {} livres en {} ms",
             chemin, moteur.nbLivres(), (System.nanoTime() - debut) / 1_000_000);
+
+        // quelques recherches avant le premier client, pour que la première requête de la démo soit rapide
+        LOG.info("Moteur chauffé en {} ms", moteur.chauffer());
         return moteur;
     }
 }

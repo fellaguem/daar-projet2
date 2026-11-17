@@ -32,14 +32,17 @@ import java.util.Map;
 // de la requête sont vides, on les compte tous.
 // Autres tris, pour comparer dans le rapport : "occurrences" (occurrences totales) et "pagerank".
 //
-// Suggestions : les voisins dans le graphe de Jaccard des 3 premiers résultats, sauf ces 3 livres,
-// du plus proche au plus loin (distance au plus proche des 3), 10 au plus.
+// Suggestions : les voisins dans le graphe de Jaccard des 3 premiers résultats qui ont des voisins
+// (cherchés parmi les 10 premiers : 14 % des livres sont isolés), sauf ces livres eux-mêmes,
+// du plus proche au plus loin (distance au plus proche d'entre eux), 10 au plus.
 public final class Moteur {
 
     public static final int NB_PREMIERS_POUR_SUGGESTIONS = 3;
+    public static final int NB_RESULTATS_EXPLORES = 10;
     public static final int NB_SUGGESTIONS = 10;
     public static final int NB_VOISINS = 10;
     public static final int TAILLE_EXTRAIT = 1500;
+    public static final int NB_TOURS_CHAUFFE = 5;
 
     public enum Tri {
         PRODUIT, OCCURRENCES, PAGERANK;
@@ -62,9 +65,10 @@ public final class Moteur {
 
     public record LivreTrouve(int id, String titre, String auteur, int occurrences, double pagerank, double score) {}
 
-    // nbMotsTrouves et motsTrouves valent null pour une recherche par mot-clef
+    // nbMotsTrouves, motsTrouves et motEntier valent null pour une recherche par mot-clef
     public record Reponse(String requete, String type, double tempsMs, List<LivreTrouve> resultats,
-                          List<LivreCourt> suggestions, Integer nbMotsTrouves, List<String> motsTrouves) {}
+                          List<LivreCourt> suggestions, Integer nbMotsTrouves, List<String> motsTrouves,
+                          Boolean motEntier) {}
 
     public record Fiche(int id, String titre, String auteur, String urlSource, String extrait,
                         List<LivreCourt> voisins) {}
@@ -128,6 +132,24 @@ public final class Moteur {
         return index.nbLivres();
     }
 
+    // Démarrage "à chaud" : quelques recherches lancées au démarrage du serveur, avant le premier
+    // client. Java compile le code le plus utilisé pendant les premiers appels : sans cela, la
+    // première regex de la démo prenait 759 ms au lieu de quelques dizaines. Ne change rien à
+    // l'état du moteur (tout est en lecture seule). Renvoie le temps passé, en millisecondes.
+    public long chauffer() {
+        long debut = System.nanoTime();
+        for (int tour = 0; tour < NB_TOURS_CHAUFFE; tour++) {
+            chercherMotCle("the whale", null);
+            chercherMotCle("ship sea", "occurrences");
+            chercherRegex("wh(a|e)le", "index", null, null);
+            chercherRegex("s(a|g|r)*on", "index", "false", "pagerank");
+            if (index.nbLivres() > 0) {
+                livre(index.idLivre(0));
+            }
+        }
+        return (System.nanoTime() - debut) / 1_000_000;
+    }
+
     public boolean estMotVide(String mot) {
         int m = index.trouver(mot);
         return m >= 0 && motVide[m];
@@ -161,23 +183,26 @@ public final class Moteur {
                 occUtiles[r] += index.occurrences(m, trouves.get(r).livre());
             }
         }
-        return reponse(requete, "motcle", debut, trouves, occUtiles, ordre, null, null);
+        return reponse(requete, "motcle", debut, trouves, occUtiles, ordre, null, null, null);
     }
 
     // ---------- recherche par regex ----------
 
-    public Reponse chercherRegex(String regex, String mode, String tri) {
+    // motEntier : "true" (défaut, aussi pour null ou vide) ou "false" (sous-chaîne), voir RechercheRegex
+    public Reponse chercherRegex(String regex, String mode, String motEntier, String tri) {
         long debut = System.nanoTime();
         String m = mode == null || mode.isBlank() ? "index" : mode.strip().toLowerCase(Locale.ROOT);
         if (m.equals("texte")) {
-            throw new RequeteInvalide("La recherche dans le texte complet n'est pas encore disponible : utiliser mode=index.");
+            throw new RequeteInvalide("La recherche dans le texte complet n'est pas disponible dans l'application "
+                + "(elle sert aux mesures) : utiliser mode=index.");
         }
         if (!m.equals("index")) {
             throw new RequeteInvalide("Mode inconnu : " + mode + " (index ou texte).");
         }
+        boolean entier = lireMotEntier(motEntier);
         Tri ordre = Tri.lire(tri);
 
-        RechercheRegex.Reponse rep = rechercheRegex.chercher(regex);
+        RechercheRegex.Reponse rep = rechercheRegex.chercher(regex, entier);
 
         // occurrences des mots trouvés non vides (ou de tous, s'ils sont tous vides), par livre
         int[] parLivre = new int[index.nbLivres()];
@@ -191,7 +216,19 @@ public final class Moteur {
         for (int r = 0; r < trouves.size(); r++) {
             occUtiles[r] = parLivre[trouves.get(r).livre()];
         }
-        return reponse(regex, "regex", debut, trouves, occUtiles, ordre, rep.nbMotsTrouves(), rep.motsTrouves());
+        return reponse(regex, "regex", debut, trouves, occUtiles, ordre, rep.nbMotsTrouves(), rep.motsTrouves(),
+            entier);
+    }
+
+    private static boolean lireMotEntier(String texte) {
+        if (texte == null || texte.isBlank()) {
+            return true;
+        }
+        switch (texte.strip().toLowerCase(Locale.ROOT)) {
+            case "true": return true;
+            case "false": return false;
+            default: throw new RequeteInvalide("motEntier doit valoir true ou false : " + texte);
+        }
     }
 
     private List<Integer> motsUtiles(List<Integer> numeros) {
@@ -210,7 +247,7 @@ public final class Moteur {
     private record Classe(int livre, LivreTrouve trouve) {}
 
     private Reponse reponse(String requete, String type, long debut, List<Resultat> trouves, int[] occUtiles,
-                            Tri ordre, Integer nbMotsTrouves, List<String> motsTrouves) {
+                            Tri ordre, Integer nbMotsTrouves, List<String> motsTrouves, Boolean motEntier) {
         List<Classe> classes = new ArrayList<>(trouves.size());
         for (int r = 0; r < trouves.size(); r++) {
             int livre = trouves.get(r).livre();
@@ -241,23 +278,29 @@ public final class Moteur {
         List<LivreCourt> suggestions = suggestions(classes);
 
         double tempsMs = Math.round((System.nanoTime() - debut) / 1e4) / 100.0;
-        return new Reponse(requete, type, tempsMs, resultats, suggestions, nbMotsTrouves, motsTrouves);
+        return new Reponse(requete, type, tempsMs, resultats, suggestions, nbMotsTrouves, motsTrouves, motEntier);
     }
 
     private List<LivreCourt> suggestions(List<Classe> classes) {
-        int nbPremiers = Math.min(NB_PREMIERS_POUR_SUGGESTIONS, classes.size());
-        boolean[] premier = new boolean[index.nbLivres()];
-        for (int r = 0; r < nbPremiers; r++) {
-            premier[classes.get(r).livre()] = true;
+        // les "sources" : les 3 premiers résultats qui ont au moins un voisin, parmi les 10 premiers.
+        // Un résultat isolé passé n'a pas besoin d'être exclu : il n'est le voisin de personne.
+        List<Integer> sources = new ArrayList<>();
+        boolean[] estSource = new boolean[index.nbLivres()];
+        for (int r = 0; r < Math.min(NB_RESULTATS_EXPLORES, classes.size())
+                && sources.size() < NB_PREMIERS_POUR_SUGGESTIONS; r++) {
+            int livre = classes.get(r).livre();
+            if (graphe.degre(livre) > 0) {
+                sources.add(livre);
+                estSource[livre] = true;
+            }
         }
 
-        // pour chaque voisin : sa distance au plus proche des premiers résultats
+        // pour chaque voisin : sa distance à la plus proche des sources
         Map<Integer, Float> distance = new HashMap<>();
-        for (int r = 0; r < nbPremiers; r++) {
-            int livre = classes.get(r).livre();
+        for (int livre : sources) {
             for (int p = graphe.debut(livre); p < graphe.fin(livre); p++) {
                 int v = graphe.voisin(p);
-                if (!premier[v]) {
+                if (!estSource[v]) {
                     distance.merge(v, graphe.distance(p), Math::min);
                 }
             }

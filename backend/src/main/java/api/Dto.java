@@ -14,13 +14,13 @@ public final class Dto {
 
     public record Suggestion(int id, String titre, String auteur) {}
 
-    // nbMotsTrouves et motsTrouves n'existent que pour une recherche par regex (type "regex") :
+    // nbMotsTrouves, motsTrouves et motEntier n'existent que pour une recherche par regex (type "regex") :
     // pour un mot-clef ils valent null et ne sont pas écrits dans le JSON.
     // tempsMs : temps du moteur (recherche, classement, suggestions), sans le réseau ni le JSON.
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record ReponseRecherche(String requete, String type, double tempsMs,
                                    List<Resultat> resultats, List<Suggestion> suggestions,
-                                   Integer nbMotsTrouves, List<String> motsTrouves) {}
+                                   Integer nbMotsTrouves, List<String> motsTrouves, Boolean motEntier) {}
 
     // erreur renvoyée avec le code 400 (requête refusée) ou 404 (livre introuvable)
     public record Erreur(String erreur) {}
@@ -35,7 +35,7 @@ public final class Dto {
             .map(t -> new Resultat(t.id(), t.titre(), t.auteur(), t.occurrences(), t.pagerank(), t.score()))
             .toList();
         return new ReponseRecherche(r.requete(), r.type(), r.tempsMs(), resultats,
-            suggestions(r.suggestions()), r.nbMotsTrouves(), r.motsTrouves());
+            suggestions(r.suggestions()), r.nbMotsTrouves(), r.motsTrouves(), r.motEntier());
     }
 
     static Livre depuis(Moteur.Fiche f) {

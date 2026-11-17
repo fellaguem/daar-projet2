@@ -24,11 +24,13 @@ public class RechercheController {
         return Dto.depuis(moteur.chercherMotCle(q, tri));
     }
 
-    // mode = index (par défaut) ou texte (pas encore disponible)
+    // mode = index (par défaut) ou texte (réservé aux mesures : erreur 400)
+    // motEntier = true (par défaut : le mot entier vérifie la regex) ou false (un morceau du mot)
     @GetMapping("/advanced")
     public Dto.ReponseRecherche avancee(@RequestParam String regex,
                                         @RequestParam(defaultValue = "index") String mode,
+                                        @RequestParam(required = false) String motEntier,
                                         @RequestParam(required = false) String tri) {
-        return Dto.depuis(moteur.chercherRegex(regex, mode, tri));
+        return Dto.depuis(moteur.chercherRegex(regex, mode, motEntier, tri));
     }
 }

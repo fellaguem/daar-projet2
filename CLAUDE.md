@@ -59,10 +59,12 @@ daar-projet2/
 
 ```
 GET /api/search?q=whale&tri=produit                               recherche par mot-clef
-GET /api/search/advanced?regex=wh(a|e)le&mode=index&tri=produit   mode = index | texte
+GET /api/search/advanced?regex=wh(a|e)le&mode=index&motEntier=true&tri=produit   mode = index | texte
 GET /api/books/{id}                                               page d'un livre
 ```
 
+`motEntier` = `true` (défaut : le mot entier vérifie la regex) ou `false` (un morceau du mot). Le contrat complet,
+avec les ajouts prévus (BM25, repli OU, passages surlignés, clics), est dans `docs/api.md`.
 `tri` = `produit` (défaut, score), `occurrences` ou `pagerank`. Réponse d'une recherche (les suggestions sont
 incluses, le front ne fait qu'un appel ; tous les résultats sont renvoyés, le front pagine) :
 

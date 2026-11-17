@@ -94,6 +94,19 @@ public final class MatcherTable implements Matcher {
         return false;
     }
 
+    // le mot entier vérifie-t-il la regex ? (automate construit sans l'enveloppe ".*")
+    // On lit tout le mot ; il faut finir dans un état final.
+    public boolean reconnait(String mot) {
+        int e = 0;
+        for (int i = 0; i < mot.length(); i++) {
+            e = suivant[e * nbColonnes + colonne[mot.charAt(i)]];
+            if (e == MORT) {
+                return false;
+            }
+        }
+        return finaux[e];
+    }
+
     public int nbEtats() {
         return finaux.length;
     }

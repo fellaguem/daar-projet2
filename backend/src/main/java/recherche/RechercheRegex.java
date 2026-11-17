@@ -15,9 +15,12 @@ import parser.Parser;
 // Recherche avancée par RegEx, dans l'index.
 //
 // La regex est testée sur chaque mot du vocabulaire (jamais sur les livres) avec l'AFD minimal
-// du projet 1, recopié dans un tableau (MatcherTable). Un mot "vérifie" la regex s'il en contient
-// une occurrence (comme egrep) :
-// "whal" trouve "whale" et "whaleboat".
+// du projet 1, recopié dans un tableau (MatcherTable). Deux façons de "vérifier" la regex :
+// - mot entier (défaut de l'API) : tout le mot doit être reconnu ; "wh(a|e)le" trouve "whale",
+//   pas "narwhale". Une regex qui accepte le mot vide est permise (".*" trouve tous les mots).
+// - sous-chaîne (comme egrep) : le mot doit contenir un morceau reconnu ; "whal" trouve "whale" et
+//   "narwhale". On construit l'automate de ".*R". Une regex qui accepte le mot vide est refusée :
+//   elle trouverait tous les mots.
 // Un livre est retenu s'il contient au moins un mot trouvé (OU) ; son score est la somme
 // des occurrences des mots trouvés dans ce livre.
 public final class RechercheRegex {
@@ -49,14 +52,20 @@ public final class RechercheRegex {
         this.index = index;
     }
 
+    // recherche en sous-chaîne (comportement d'origine, comme egrep)
     public Reponse chercher(String regex) {
-        Afd automate = construireAutomate(regex);
+        return chercher(regex, false);
+    }
+
+    public Reponse chercher(String regex, boolean motEntier) {
+        Afd automate = construireAutomate(regex, motEntier);
         MatcherTable matcher = new MatcherTable(automate); // même résultat que MatcherUnePasse, plus rapide
 
         // 1. les mots du vocabulaire qui vérifient la regex
         List<Integer> mots = new ArrayList<>();
         for (int m = 0; m < index.nbMots(); m++) {
-            if (matcher.contientMotif(index.mot(m))) {
+            String mot = index.mot(m);
+            if (motEntier ? matcher.reconnait(mot) : matcher.contientMotif(mot)) {
                 mots.add(m);
             }
         }
@@ -84,8 +93,8 @@ public final class RechercheRegex {
         return new Reponse(resultats, mots.size(), premiers, mots);
     }
 
-    // regex -> AFD minimal de ".*regex" (recherche d'une sous-chaîne)
-    private static Afd construireAutomate(String regex) {
+    // regex -> AFD minimal de "regex" (mot entier) ou de ".*regex" (sous-chaîne)
+    private static Afd construireAutomate(String regex, boolean motEntier) {
         String r = regex == null ? "" : regex.strip();
         if (r.isEmpty()) {
             throw new RegexInvalide("La regex est vide.");
@@ -99,15 +108,18 @@ public final class RechercheRegex {
         Afd automate;
         try {
             AstI ast = new Parser(r).parse();
-            automate = new ConstructionAutomate(MatcherUnePasse.envelopper(ast), ETATS_MAX).getAfdMinimal();
+            automate = new ConstructionAutomate(motEntier ? ast : MatcherUnePasse.envelopper(ast), ETATS_MAX)
+                .getAfdMinimal();
         } catch (AutomateTropGrandException e) {
             throw new RegexInvalide("La regex est trop complexe (l'automate dépasse " + ETATS_MAX + " états).");
         } catch (RuntimeException e) {
             throw new RegexInvalide("Regex invalide : " + e.getMessage());
         }
 
-        // si l'état initial est final, la regex accepte le mot vide et trouverait tous les mots
-        if (automate.getFinaux().contains(automate.getInitial())) {
+        // en sous-chaîne, si l'état initial est final, la regex accepte le mot vide et trouverait tous
+        // les mots. En mot entier, c'est permis : le mot vide n'est pas dans l'index ("a*" ne trouve
+        // que les mots faits de "a").
+        if (!motEntier && automate.getFinaux().contains(automate.getInitial())) {
             throw new RegexInvalide("Cette regex accepte le mot vide : elle trouverait tous les livres.");
         }
         return automate;

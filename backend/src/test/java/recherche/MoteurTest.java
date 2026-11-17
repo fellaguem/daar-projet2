@@ -5,12 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import corpus.Metadonnees;
+import graphe.Graphe;
+import graphe.Jaccard;
 import graphe.PageRank;
 import index.Index;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -144,16 +148,58 @@ class MoteurTest {
     }
 
     @Test
+    void suggestionsQuandLesPremiersResultatsSontIsoles(@TempDir Path d) throws IOException {
+        // livres 1, 2, 3 : isolés ; 4 et 5 voisins (le livre 5 ne contient pas "zebra")
+        Index.Constructeur c = new Index.Constructeur();
+        c.ajouterLivre(1, "zebra zebra zebra zebra");
+        c.ajouterLivre(2, "zebra zebra zebra");
+        c.ajouterLivre(3, "zebra zebra");
+        c.ajouterLivre(4, "zebra");
+        c.ajouterLivre(5, "lion");
+        Index idx = c.construire();
+        int[] ids = {1, 2, 3, 4, 5};
+        float[] dist = new float[ids.length * (ids.length - 1) / 2];
+        Arrays.fill(dist, 1f);
+        dist[Jaccard.indicePaire(3, 4, ids.length)] = 0.2f;
+        Graphe g = Graphe.depuisDistances(ids, dist, 0.5);
+        StringBuilder meta = new StringBuilder();
+        for (int id : ids) {
+            meta.append(id).append("\tTitre ").append(id).append("\tAuteur\ten\thttps://www.gutenberg.org/ebooks/")
+                .append(id).append("\t10000\n");
+        }
+        Files.writeString(d.resolve("metadonnees.tsv"), meta, StandardCharsets.UTF_8);
+        Moteur m = new Moteur(idx, g, PageRank.calculer(g).scores(), Metadonnees.charger(d.resolve("metadonnees.tsv")),
+            d.resolve("livres"));
+
+        Moteur.Reponse r = m.chercherMotCle("zebra", "occurrences");
+        assertEquals(List.of(1, 2, 3, 4), ids(r));
+        // les 3 premiers n'ont pas de voisin : on descend jusqu'au 4e, dont le voisin est le livre 5
+        assertEquals(List.of(5), r.suggestions().stream().map(Moteur.LivreCourt::id).toList());
+    }
+
+    @Test
+    void chaufferNeChangeRien() {
+        Moteur.Reponse avant = moteur.chercherMotCle("the whale", null);
+        assertTrue(moteur.chauffer() >= 0);
+        Moteur.Reponse apres = moteur.chercherMotCle("the whale", null);
+        assertEquals(avant.resultats(), apres.resultats());
+        assertEquals(avant.suggestions(), apres.suggestions());
+    }
+
+    @Test
     void rechercheParRegex() {
-        Moteur.Reponse r = moteur.chercherRegex("wha", "index", null);
+        // sous-chaîne : "wha" trouve "whale"
+        Moteur.Reponse r = moteur.chercherRegex("wha", "index", "false", null);
         assertEquals("regex", r.type());
+        assertEquals(false, r.motEntier());
         assertEquals(1, r.nbMotsTrouves());
         assertEquals(List.of("whale"), r.motsTrouves());
         assertEquals(ids(moteur.chercherMotCle("whale", null)), ids(r));
 
         // "the" (vide) et "whale" trouvés : seul whale compte dans le score ;
         // les livres 4, 5, 6 n'ont que "the" : score 0, en dernier
-        Moteur.Reponse r2 = moteur.chercherRegex("(the|whale)", null, null);
+        Moteur.Reponse r2 = moteur.chercherRegex("(the|whale)", null, null, null);
+        assertEquals(true, r2.motEntier()); // défaut
         assertEquals(6, r2.resultats().size());
         for (LivreTrouve t : r2.resultats()) {
             assertEquals(score(t.id(), "whale"), t.score(), 1e-12);
@@ -161,10 +207,26 @@ class MoteurTest {
         assertEquals(List.of(4, 5, 6), ids(r2).subList(3, 6).stream().sorted().toList());
 
         // seulement des mots vides trouvés : on les compte
-        Moteur.Reponse r3 = moteur.chercherRegex("th", "index", null);
+        Moteur.Reponse r3 = moteur.chercherRegex("th", "index", "false", null);
         for (LivreTrouve t : r3.resultats()) {
             assertEquals(score(t.id(), "the"), t.score(), 1e-12);
         }
+    }
+
+    @Test
+    void regexMotEntierParDefaut() {
+        // "wha" n'est pas un mot entier de l'index ; "wha.*" oui
+        assertEquals(0, moteur.chercherRegex("wha", null, null, null).nbMotsTrouves());
+        assertEquals(List.of("whale"), moteur.chercherRegex("wha.*", null, "TRUE", null).motsTrouves());
+        // "ea" : mot entier, aucun ; sous-chaîne : sea, ocean
+        assertEquals(0, moteur.chercherRegex("ea", null, "true", null).nbMotsTrouves());
+        assertEquals(List.of("ocean", "sea"), moteur.chercherRegex("ea", null, "false", null).motsTrouves());
+
+        // une regex qui accepte le mot vide est permise en mot entier : ".*" trouve tous les mots, tous les livres
+        Moteur.Reponse tout = moteur.chercherRegex(".*", null, null, null);
+        assertEquals(index.nbMots(), tout.nbMotsTrouves());
+        assertEquals(6, tout.resultats().size());
+        assertEquals(0, moteur.chercherRegex("a*", null, null, null).nbMotsTrouves()); // aucun mot fait de "a"
     }
 
     @Test
@@ -173,11 +235,12 @@ class MoteurTest {
         assertThrows(RequeteInvalide.class, () -> moteur.chercherMotCle("a ... !", null)); // rien à chercher
         assertThrows(RequeteInvalide.class, () -> moteur.chercherMotCle(null, null));
         assertThrows(RequeteInvalide.class, () -> moteur.chercherMotCle("whale", "titre"));
-        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("(wha", "index", null));
-        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("a*", "index", null));
-        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "texte", null));
-        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "autre", null));
-        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "index", "titre"));
+        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("(wha", "index", null, null));
+        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("a*", "index", "false", null));
+        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "texte", null, null));
+        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "autre", null, null));
+        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "index", null, "titre"));
+        assertThrows(RequeteInvalide.class, () -> moteur.chercherRegex("wha", "index", "oui", null));
     }
 
     @Test

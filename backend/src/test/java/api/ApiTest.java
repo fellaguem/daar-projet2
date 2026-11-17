@@ -90,6 +90,7 @@ class ApiTest {
         // champs propres à la regex : absents
         assertFalse(c.has("nbMotsTrouves"));
         assertFalse(c.has("motsTrouves"));
+        assertFalse(c.has("motEntier"));
     }
 
     @Test
@@ -97,6 +98,7 @@ class ApiTest {
         Rep r = get("/api/search/advanced?regex=" + enc("wh(a|e)le") + "&mode=index");
         assertEquals(200, r.code());
         assertEquals("regex", r.corps().get("type").asText());
+        assertTrue(r.corps().get("motEntier").asBoolean()); // défaut
         assertEquals(1, r.corps().get("nbMotsTrouves").asInt());
         assertEquals("whale", r.corps().get("motsTrouves").get(0).asText());
         assertEquals(3, r.corps().get("resultats").size());
@@ -129,8 +131,9 @@ class ApiTest {
                 "/api/search",                                     // q absent
                 "/api/search?q=whale&tri=titre",                   // tri inconnu
                 "/api/search/advanced?regex=" + enc("(wha"),       // regex mal écrite
-                "/api/search/advanced?regex=" + enc("a*"),         // accepte le mot vide
-                "/api/search/advanced?regex=wha&mode=texte",       // pas encore disponible
+                "/api/search/advanced?regex=" + enc("a*") + "&motEntier=false", // accepte le mot vide
+                "/api/search/advanced?regex=wha&motEntier=oui",    // motEntier inconnu
+                "/api/search/advanced?regex=wha&mode=texte",       // réservé aux mesures
                 "/api/books/abc")) {                               // id pas un nombre
             Rep r = get(chemin);
             assertEquals(400, r.code(), chemin);

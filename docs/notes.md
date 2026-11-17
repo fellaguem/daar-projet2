@@ -244,6 +244,39 @@ ponctuation).
 Environ 4 fois plus rapide. 10 essais après 3 appels de chauffe, une seule exécution du programme
 (`data/mesures/regex_index.csv`).
 
+### Mot entier par défaut (décidé le 13/11/2026)
+
+Avec la sous-chaîne, les regex courtes trouvent presque tout : `s(a|g|r)*on` trouve 2 294 mots et les
+1 893 livres (« son » est dans « person », « reason »…), `whale` trouve 27 mots dont « narwhale ».
+L'énoncé parle d'un mot « qui vérifie la RegEx » : le mot entier doit être reconnu. C'est le défaut
+de l'API (`motEntier=true`) ; `motEntier=false` garde la sous-chaîne.
+Mot entier : automate de la regex seule (sans `.*` devant), `MatcherTable.reconnait` lit tout le mot
+et doit finir dans un état final. Une regex qui accepte le mot vide est alors permise (`.*` trouve
+tous les mots). Tests : `MatcherTableTest` compare à `java.util.regex` (`matches()` pour le mot
+entier, `find()` pour la sous-chaîne) sur 20 regex et plus de 10 000 mots.
+
+`MesureRegex` (même exécution, 10 essais après 3 de chauffe, mot entier mesuré d'abord) :
+
+| regex | mot entier (ms) | mots | livres | sous-chaîne (ms) | mots | livres |
+|---|---|---|---|---|---|---|
+| `whale` | 6,1 ± 2,0 | 1 | 282 | 16,0 ± 5,5 | 27 | 410 |
+| `wh(a\|e)le` | 4,1 ± 0,4 | 1 | 282 | 11,7 ± 0,5 | 30 | 414 |
+| `s(a\|g\|r)*on` | 4,4 ± 1,1 | 5 | 1 703 | 11,9 ± 0,9 | 2 294 | 1 893 |
+| `a.*b` | 4,3 ± 0,4 | 86 | 660 | 14,0 ± 1,9 | 17 231 | 1 893 |
+| `.*ing` | 19,1 ± 2,3 | 11 916 | 1 893 | 25,0 ± 7,0 | 18 850 | 1 893 |
+| `(sh\|wh)(a\|o)(l\|r)(e\|k)` | 5,5 ± 0,2 | 8 | 1 889 | 11,6 ± 0,5 | 192 | 1 889 |
+| `q.*z` | 6,0 ± 0,7 | 8 | 133 | 10,9 ± 0,5 | 146 | 1 062 |
+| `.*` | 59,4 ± 20,1 | 415 869 | 1 893 | (refusée) | | |
+
+Le mot entier est plus rapide : un mot qui ne commence pas comme la regex est rejeté dès les premières
+lettres (état mort). `.*` coûte surtout le regroupement des 12,4 millions de postings, pas l'automate.
+Par le serveur (moteur complet, classement et suggestions) : `.*` 100 à 120 ms, réponse de 363 Ko.
+
+**Attention pour les courbes** : la sous-chaîne mesurée ici (11 à 16 ms) est bien plus rapide que la
+mesure du matin (31 à 40 ms, programme lancé à froid). Seule différence : la JVM a déjà été chauffée par
+les mesures en mot entier. 3 appels de chauffe ne suffisent pas ; pour le rapport, chauffer plus
+longtemps (par exemple 2 s de requêtes) et mesurer chaque série dans un ordre varié.
+
 ## Projet 1 étendu (modifications du code copié dans backend/)
 
 1. `Determinisation` et `ConstructionAutomate` : constructeur avec limite `etatsMax` sur le nombre
@@ -420,6 +453,36 @@ Cachalot, South Sea Tales ; suggestions : Adventure, Two Years Before the Mast, 
 The Sea-Wolf… `pagerank` met en tête des livres qui ne citent le mot qu'une à quatre fois (l'encyclopédie) :
 c'est pour cela que le tri par défaut est le produit. Regex `wh(a|e)le` : 30 mots, 414 livres,
 759 ms au premier appel (à mesurer à chaud pour les courbes ; 14 à 22 ms sur test20).
+
+### Démarrage à chaud (13/11/2026)
+
+Java compile le code le plus utilisé pendant les premiers appels : la première requête est lente.
+Deux étapes au démarrage, avant le premier client :
+- `Moteur.chauffer()` : 5 tours de 2 recherches par mot-clef, 2 regex et une page de livre (747 ms
+  sur le vrai corpus) ;
+- `api.ChauffeHttp` : le serveur s'envoie 3 fois 5 requêtes HTTP sur 127.0.0.1, pour chauffer aussi
+  Spring MVC et l'écriture du JSON (1,8 s).
+
+Démarrage complet : 12 s (chargement des fichiers 1,6 s). Mesures avec `curl` (aller-retour HTTP
+complet, sur la même machine), premières requêtes après le démarrage :
+
+| Requête | Sans chauffe | Avec chauffe |
+|---|---|---|
+| première regex (`q.*z`, 198 Ko de JSON) | 643 ms | 65 ms |
+| mot-clef `love` (1 799 résultats, 339 Ko) | 79 ms | 46 ms |
+| page d'un livre | 27 ms | 18 ms |
+
+Temps du moteur seul (`tempsMs`) pour la première regex : 759 ms avant (`MatcherUnePasse`, sans chauffe),
+55 ms après. Le reste de l'aller-retour est surtout l'écriture du JSON : tous les résultats sont
+renvoyés (jusqu'à 360 Ko). À noter : `ConvertFrom-Json` de PowerShell 5 met plus d'une seconde à lire
+ces réponses, il ne faut pas l'utiliser pour mesurer.
+
+### Suggestions : repli pour les livres isolés (13/11/2026)
+
+14 % des livres sont isolés dans le graphe. Si l'un des 3 premiers résultats est isolé, on prend à
+sa place le résultat suivant qui a des voisins : les sources des suggestions sont les 3 premiers
+résultats qui ont au moins un voisin, cherchés parmi les 10 premiers. Le graphe et le PageRank ne
+changent pas. Test : `MoteurTest.suggestionsQuandLesPremiersResultatsSontIsoles`.
 
 ### Téléchargement du corpus (lancé le 13/11/2026 à 01:08)
 
