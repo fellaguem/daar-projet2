@@ -584,3 +584,40 @@ Un essai depuis un deuxième PC a été fait le 17/11 (version précédente du f
 téléphone reste à faire.
 
 Suite JUnit : 118 tests, tous verts (inchangée, aucun code Java modifié).
+
+### Polissage du front (18/11/2026, soir)
+
+Après un parcours complet du site, les pages Accueil et Livre étaient pauvres (premier écran de la vidéo
+vide, fiche en bloc italique) et les chiffres des résultats trop petits. Seuls du JSX et du CSS ont changé.
+
+- **Accueil** : une phrase de présentation (« Près de 1 900 livres en anglais du projet Gutenberg… », pas de
+  nombre exact en dur, l'API ne le donne pas), 3 exemples cliquables (`whale`, `white whale`, `wh(a|e)le`)
+  qui ouvrent directement les résultats, curseur dans le champ sur ordinateur seulement (sur téléphone le
+  clavier cacherait la page).
+- **Fiche Livre** :
+  - l'« extrait » renvoyé par l'API est surtout la page de titre et la table des matières (Moby-Dick :
+    éditeur, dédicace, « CONTENTS » ; Pride and Prejudice : 19 paragraphes dont 11 de légendes
+    d'illustrations). Il est donc présenté sous le titre honnête **« Début du livre »** ;
+  - **8 lignes environ** (hauteur 12em à 1,5 d'interligne), fondu en bas, « Afficher plus » seulement si le
+    texte dépasse ;
+  - **illustrations retirées** : un bloc va de « [Illustration » au « ] » qui le ferme, parfois sur plusieurs
+    paragraphes (Pride and Prejudice : 19 → 8 paragraphes) ; les `_..._` (italique Gutenberg) sont retirés ;
+  - bouton « Lire le livre sur Project Gutenberg » ;
+  - **retour** : « ← Retour » revient à la page précédente de l'appli ; sans page précédente (lien ouvert
+    directement, page rechargée), le bouton devient « ← Accueil », pour ne pas quitter le site.
+- **Résultats** :
+  - chiffres en 14px, foncés, pertinence en gras (avant : 12px gris, illisibles dans une vidéo) ;
+  - mots trouvés par la regex en pastilles (avant : petite ligne grise, alors que c'est le résultat clé
+    d'une recherche avancée) ;
+  - titres limités à 2 lignes avec « … » (titre complet en infobulle) ; nombres avec espace (« 1 893 ») ;
+  - **une ligne sous le titre des suggestions** : « Voisins des meilleurs résultats dans le graphe de Jaccard
+    (livres au vocabulaire proche) ».
+
+Seul écart de disposition avec la maquette, à justifier dans le rapport : la ligne sous les suggestions.
+Phrase proposée : *« Une ligne sous le titre des suggestions rappelle leur origine (voisins de Jaccard des
+meilleurs résultats), pour que l'utilisateur comprenne pourquoi ces livres sont proposés. »* Les autres
+changements de la vue Résultats sont de la mise en forme (taille, couleur, pastilles), libre par rapport à la
+maquette. Accueil et Livre ne sont pas dans la maquette.
+
+Vérification : captures en largeur ordinateur (1280 px) et téléphone (390 px, émulation mobile de Chrome),
+aucun débordement horizontal sur les 10 pages testées ; 118 tests JUnit verts.
