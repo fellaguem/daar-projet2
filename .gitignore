@@ -6,8 +6,11 @@ dist/
 backend/src/main/resources/static/
 .idea/
 .vscode/
+# réglages locaux de Claude Code (personnels, hors dépôt)
+.claude/
+CLAUDE.md
 # projet 1 d origine (déjà copié dans backend/)
 DAAR1-main/
 
-# copie des classes pour le t�l�chargement du corpus
+# copie des classes pour le téléchargement du corpus
 tools/

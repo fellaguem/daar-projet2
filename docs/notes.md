@@ -527,3 +527,60 @@ Page d'Alice (11) : premier voisin Through the Looking-Glass (12).
 
 Tests : MoteurTest (13, sur un corpus de 6 livres construit comme le vrai), ApiTest (6, serveur réel sur un port
 libre : contrat JSON, tris, suggestions, 400/404, 200 requêtes simultanées). Suite complète : 104 tests.
+
+## Front adapté à la maquette (18/11/2026)
+
+La première version du front, testée sur le corpus complet le 17/11, avait plusieurs défauts : suggestions
+tout en bas (après les 282 résultats de « whale »), PageRank à 20 décimales, ordre des résultats non
+expliqué, pas de choix du tri, tous les résultats d'un coup. Maquette corrigée de la vue Résultats
+(canevas de design de Claude), images dans `docs/maquette/` : `v1-capture.png` (avant),
+`maquette-resultats.png`, `maquette-regex.png`. Le front a ensuite été modifié pour la suivre. Seul le
+front a changé : aucun code Java, l'API était déjà complète.
+
+Choix :
+- **Pertinence en %** : score / meilleur score de la recherche × 100, arrondi à l'entier, « < 1 % » en
+  dessous de 1. Le meilleur est pris sur **tous** les résultats, pas seulement ceux affichés. Le score
+  brut va de 1e-5 à 1e-10 et ne se lit pas. Ce n'est pas une probabilité : on ne peut pas comparer les %
+  de deux recherches. Trié par occurrences ou PageRank, les % ne sont plus décroissants (normal : trié
+  par PageRank, les premiers livres de « whale » sont à « < 1 % »).
+- **« Voir plus »** : 20 résultats de plus par clic ; la liste repart à 20 à chaque recherche ou tri.
+- **Menu de tri** : Pertinence (`produit`), Occurrences, PageRank. Le tri est dans l'adresse (`&tri=`),
+  le bouton retour le garde ; une nouvelle recherche repart sur Pertinence.
+- **Suggestions** : les 10 renvoyées par le serveur, placées **avant** la liste, titre seul, en pastilles.
+  Titres coupés à 60 caractères avec « … » (titre complet et auteur en infobulle) : certains titres
+  Gutenberg font 273 caractères. Même composant pour les livres proches de la page Livre.
+- **Regex** : « Mots trouvés (k) : … », 20 mots affichés (le serveur en renvoie 50 au plus, sur 11 888
+  pour `[a-z]*ing`).
+- PageRank à 4 décimales ; nombres au format français (« 0,0012 », « 0,54 ms »).
+- Téléphone (moins de 600 px) : les chiffres passent sous le titre.
+- Écarts avec la maquette : virgule décimale (maquette : « 0.00xx ») ; pastilles à coins arrondis de
+  16 px (maquette : forme de gélule), pour rester propres sur deux lignes.
+
+Messages (sous la barre de recherche, en rouge pour une erreur) :
+- aucun livre : « Aucun livre ne contient « requête ». Essayez un autre mot. » ;
+- regex sans mot trouvé : « Aucun mot de l'index ne vérifie « regex ». Essayez une autre expression. » ;
+- regex invalide : le message du serveur, tel quel (« Regex invalide : Parenthèse fermante manquante »).
+  Avant, le front n'affichait que « Erreur 400 ».
+
+Requêtes testées sur le serveur réel (jar reconstruit, 1 893 livres, adresses fabriquées comme le front) :
+
+| Requête | Résultats | `tempsMs` | Suggestions |
+|---|---|---|---|
+| `whale` (tris produit / occurrences / pagerank) | 282 | 0,63 / 1,51 / 0,75 | 10 |
+| `white whale` | 278 | 0,77 | 10 |
+| `the` | 1 893 | 5,69 | 10 |
+| `xyzqwk` | 0 | 3,05 | 0 |
+| regex `wh(a\|e)le` | 282 (1 mot trouvé) | 20,16 | 10 |
+| regex `[a-z]*ing` | 1 893 (11 888 mots trouvés) | 75,16 | 10 |
+| regex `xq[z]+` | 0 (0 mot) | 3,53 | 0 |
+| regex `(ab` | 400 « Regex invalide : Parenthèse fermante manquante » | — | — |
+| fiche de Moby-Dick (`/api/books/15`) | 10 voisins | — | — |
+| livre inconnu (`/api/books/99999999`) | 404 | — | — |
+
+Test de charge : 20 recherches par mot-clef différentes, envoyées **en même temps** (curl en parallèle)
+**depuis la machine serveur vers sa propre adresse sur le réseau local** : 20 réponses 200 en 0,7 s au
+total. Ce n'est **pas** le test sur plusieurs machines : les requêtes partent toutes de la même machine.
+Un essai depuis un deuxième PC a été fait le 17/11 (version précédente du front) ; le test depuis un
+téléphone reste à faire.
+
+Suite JUnit : 118 tests, tous verts (inchangée, aucun code Java modifié).

@@ -1,9 +1,18 @@
 # Reprise du travail
 
-À lire au début de chaque session. Mis à jour le 13/11/2026 (après la construction sur le vrai corpus).
+À lire au début de chaque session. Mis à jour le 18/11/2026 (front adapté à la maquette).
+
+Gel des fonctionnalités : jeudi 19/11 à midi. Rendu : dimanche 22/11, 23h59.
 
 ## État
 
+- **Toutes les exigences de l'énoncé sont faites** : recherche par mot-clef, recherche avancée par
+  regex (mode index), classement avec PageRank, suggestions (voisins de Jaccard), 118 tests JUnit verts.
+- **Front fait** (18/11) : adapté à la maquette de la vue Résultats (`docs/maquette/`) : pertinence en %,
+  menu de tri, « Voir plus » par 20, suggestions avant la liste, mots trouvés, messages d'erreur, version
+  téléphone. Choix et requêtes testées dans `docs/notes.md` (« Front adapté à la maquette »).
+- Démo : essai réussi depuis un deuxième PC le 17/11 ; 20 recherches simultanées OK (depuis la machine
+  serveur). Le pare-feu Windows autorisait déjà Java, aucun port à ouvrir.
 - Corpus téléchargé (fin le 13/11 à 05:06) : 1 900 livres, puis 7 doublons retirés
   (`corpus.RetraitDoublons`, fichiers déplacés dans `data/doublons/`) : **1 893 livres**.
 - `data/` contient l'index, le graphe et le PageRank du vrai corpus. Le serveur démarre dessus
@@ -30,25 +39,21 @@
 - Livres isolés : le graphe reste tel quel ; les suggestions prennent les 3 premiers résultats qui ont
   des voisins, parmi les 10 premiers (fait le 13/11).
 - Démarrage à chaud : `Moteur.chauffer()` et `api.ChauffeHttp` (fait le 13/11).
-- Contrat complet des ajouts écrit dans `docs/api.md` (13/11), avec les choix validés :
-  - suggestions : tous les voisins des sources, les 10 qui ont le plus de clics, à égalité les plus
-    proches ; champ `clics` sur chaque suggestion ;
-  - repli OU : les mots vides ne comptent pas dans le OU (sauf requête de mots vides seulement) ;
-  - BM25 : idf = ln(1 + (N - df + 0,5) / (df + 0,5)), k1 = 1,2, b = 0,75 ;
-  - passages surlignés : texte mis en minuscules lettre par lettre (`Character.toLowerCase`), KMP ;
-  - `clics.tsv` écrit toutes les 30 s et à l'arrêt du serveur.
+- Pertinence affichée en % du meilleur score de la recherche (le score brut est illisible) (18/11).
+- **Ajouts abandonnés (18/11), car ils ne sont pas demandés par l'énoncé** : BM25, repli OU,
+  « pourquoi ce résultat », passages surlignés, clics. Leur contrat reste dans `docs/api.md`, marqué
+  « abandonné (hors énoncé) » ; rien n'a été codé.
 
-## Planning des ajouts
+## Reste à faire
 
-- Samedi 14 : BM25 (`tri=bm25`, champ `bm25`), repli OU (`repli`, `motsPresents`).
-- Dimanche 15 : « pourquoi ce résultat » (`occurrencesUtiles`, `longueur`, `motsVides`), passages
-  surlignés, clics.
-
-## Pistes ouvertes
-
-- Pour les courbes du 16/11 : il faut pouvoir construire index et graphe sur une partie du corpus
-  (100, 400, 800 livres), et chauffer la JVM plus longtemps que 3 appels (voir notes.md).
-- Corrections du planning : `.gitignore` en UTF-8, README, répartition dans `CLAUDE.md`.
+- Test sur téléphone (même réseau, ou partage de connexion si le wifi isole les appareils).
+- Mesures sur sous-corpus (100, 400, 800, 1 893 livres) : construire index et graphe sur les N premiers
+  livres, mesurer les temps (moyenne ± écart type) pour les courbes, chauffer la JVM plus longtemps que
+  3 appels (voir notes.md).
+- README avec les commandes.
+- Rapport (12 pages environ).
+- Vidéo de 5 min avec la démo sur 2 machines.
+- Archive `daar-projet2-FELLAGUE-MANSOUS.zip` de moins de 30 Mo, sans le corpus.
 
 ## Reconstruire les données
 
