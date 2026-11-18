@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 // Champ de recherche : mot-clef ou RegEx (recherche avancée)
-export default function BarreRecherche({ valeur = '', avance = false }) {
+export default function BarreRecherche({ valeur = '', avance = false, autoFocus = false }) {
   const [texte, setTexte] = useState(valeur)
   const [regex, setRegex] = useState(avance)
   const aller = useNavigate()
@@ -30,6 +30,7 @@ export default function BarreRecherche({ valeur = '', avance = false }) {
     <form onSubmit={envoyer} className="carte barre">
       <input
         className="champ"
+        autoFocus={autoFocus}
         aria-label={regex ? 'Expression régulière' : 'Mot-clef'}
         value={texte}
         onChange={(e) => setTexte(e.target.value)}

@@ -55,7 +55,7 @@ function Contenu({ reponse, tri, changerTri }) {
     <>
       <div className="entete-resultats">
         <p className="compteur">
-          <strong>{n} résultat{n > 1 ? 's' : ''}</strong> pour « {reponse.requete} » ·{' '}
+          <strong>{n.toLocaleString('fr-FR')} résultat{n > 1 ? 's' : ''}</strong> pour « {reponse.requete} » ·{' '}
           {reponse.tempsMs.toLocaleString('fr-FR')} ms
         </p>
         {n > 1 && (
@@ -80,7 +80,11 @@ function Contenu({ reponse, tri, changerTri }) {
         </p>
       ) : (
         <>
-          <Suggestions titre="Suggestions — livres proches" livres={reponse.suggestions} />
+          <Suggestions
+            titre="Suggestions — livres proches"
+            sousTitre="Voisins des meilleurs résultats dans le graphe de Jaccard (livres au vocabulaire proche)"
+            livres={reponse.suggestions}
+          />
           {/* la clé change à chaque recherche ou tri : la liste repart à 20 résultats */}
           <ListeResultats key={reponse.type + ':' + reponse.requete + ':' + tri} resultats={reponse.resultats} />
         </>
@@ -89,14 +93,19 @@ function Contenu({ reponse, tri, changerTri }) {
   )
 }
 
-// mots de l'index qui vérifient la regex
+// mots de l'index qui vérifient la regex, en pastilles (le résultat clé d'une recherche avancée)
 function MotsTrouves({ reponse }) {
   const mots = reponse.motsTrouves.slice(0, MOTS_AFFICHES)
   const reste = reponse.nbMotsTrouves - mots.length
   return (
-    <p className="mots-trouves">
-      Mots trouvés ({reponse.nbMotsTrouves.toLocaleString('fr-FR')}) : <code>{mots.join(', ')}</code>
-      {reste > 0 && <> … et {reste.toLocaleString('fr-FR')} autre{reste > 1 ? 's' : ''}</>}
-    </p>
+    <div className="mots-trouves">
+      <span>Mots trouvés ({reponse.nbMotsTrouves.toLocaleString('fr-FR')}) :</span>
+      <ul className="pastilles">
+        {mots.map((m) => (
+          <li key={m}><span className="pastille mot">{m}</span></li>
+        ))}
+      </ul>
+      {reste > 0 && <span>… et {reste.toLocaleString('fr-FR')} autre{reste > 1 ? 's' : ''}</span>}
+    </div>
   )
 }

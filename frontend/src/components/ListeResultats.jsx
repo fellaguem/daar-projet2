@@ -30,13 +30,16 @@ export default function ListeResultats({ resultats }) {
         {resultats.slice(0, nbAffiches).map((r, i) => (
           <li key={r.id} className="resultat">
             <div className="livre">
-              {i + 1}. <Link className="titre" to={'/livre/' + r.id}>{r.titre}</Link>
+              {/* titre limité à 2 lignes (certains dépassent 250 caractères), complet en infobulle */}
+              <div className="ligne-titre">
+                {i + 1}. <Link className="titre" to={'/livre/' + r.id} title={r.titre}>{r.titre}</Link>
+              </div>
               {r.auteur && <div className="auteur">{r.auteur}</div>}
             </div>
             <div className="chiffres">
               <div>Occurrences : {r.occurrences.toLocaleString('fr-FR')}</div>
               <div>PageRank : {pageRank(r.pagerank)}</div>
-              <div>Pertinence : {pertinence(r.score, meilleur)}</div>
+              <div className="pertinence">Pertinence : <strong>{pertinence(r.score, meilleur)}</strong></div>
             </div>
           </li>
         ))}
@@ -44,7 +47,7 @@ export default function ListeResultats({ resultats }) {
       {nbAffiches < n && (
         <div className="voir-plus">
           <button type="button" onClick={() => setNbAffiches(nbAffiches + PAR_PAGE)}>
-            Voir plus ({nbAffiches} / {n})
+            Voir plus ({nbAffiches} / {n.toLocaleString('fr-FR')})
           </button>
         </div>
       )}

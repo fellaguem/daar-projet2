@@ -11,6 +11,13 @@ h1 { font-size: 20px; }
 .logo { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #999; border-radius: 6px; background: #fff; }
 main { padding-top: 16px; padding-bottom: 48px; }
 
+/* accueil : présentation et exemples cliquables */
+.accueil h1 { font-size: 24px; margin: 24px 0 8px; }
+.accueil .intro { color: #444; line-height: 1.5; margin: 0 0 20px; max-width: 680px; }
+.exemples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 14px; color: #444; }
+.pastille.regex { font-family: ui-monospace, Consolas, monospace; }
+.type-exemple { font-size: 12px; color: #666; }
+
 /* cartes blanches (barre, suggestions, liste) */
 .carte { background: #fff; border: 1px solid #999; border-radius: 10px; }
 
@@ -26,11 +33,14 @@ main { padding-top: 16px; padding-bottom: 48px; }
 .compteur { margin: 0; font-size: 14px; color: #333; }
 .entete-resultats .tri { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; }
 .tri select { border: 1px solid #999; border-radius: 6px; padding: 6px 10px; font-size: 13px; background: #fff; color: #333; }
-.mots-trouves { font-size: 13px; color: #444; overflow-wrap: anywhere; }
+/* mots trouvés par la regex : pastilles sans lien, en police à chasse fixe */
+.mots-trouves { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 14px 0 0; font-size: 14px; color: #333; }
+.pastille.mot { font-family: ui-monospace, Consolas, monospace; background: #f4f4f2; border-color: #bbb; color: #222; }
 
 /* suggestions et livres proches, en pastilles */
 .suggestions { border: 2px solid #333; padding: 16px 20px; margin-top: 16px; }
 .suggestions h2 { font-size: 15px; margin: 0 0 10px; }
+.suggestions .sous-titre { margin: -6px 0 10px; font-size: 13px; color: #555; }
 .pastilles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 /* rayon de 16px et non 999px : une pastille qui passe sur deux lignes (téléphone) reste propre */
 .pastille { display: inline-block; border: 1px solid #999; border-radius: 16px; padding: 5px 12px; font-size: 13px; color: #333; background: #fff; }
@@ -43,14 +53,30 @@ main { padding-top: 16px; padding-bottom: 48px; }
 .resultat:last-child { border-bottom: none; }
 .resultat .livre { min-width: 0; overflow-wrap: anywhere; }
 .resultat .titre { font-weight: 700; color: #222; }
+/* titre limité à 2 lignes, coupé avec « … » */
+.ligne-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .auteur { color: #666; }
 .resultat .auteur { font-size: 0.8em; }
-.chiffres { font-size: 12px; color: #555; text-align: right; white-space: nowrap; }
+/* chiffres lisibles aussi dans une vidéo : 14px, foncés, pertinence en gras */
+.chiffres { font-size: 14px; line-height: 1.45; color: #333; text-align: right; white-space: nowrap; }
+.chiffres .pertinence strong { color: #000; }
 .voir-plus { display: flex; justify-content: center; padding: 18px; border-top: 1px dashed #bbb; }
 .voir-plus button { border: 1px solid #333; background: #fff; color: #333; border-radius: 8px; padding: 10px 24px; font-size: 14px; cursor: pointer; }
 
 /* page d'un livre */
-blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 12px; font-style: italic; }
+.retour { display: inline-block; margin-bottom: 12px; padding: 0; border: none; background: none; font: inherit; font-size: 14px; color: #222; text-decoration: underline; cursor: pointer; }
+.fiche { padding: 20px 24px; }
+.fiche h1 { margin: 0 0 4px; font-size: 22px; overflow-wrap: anywhere; }
+.fiche .auteur { margin: 0 0 16px; }
+.bouton-lien { display: inline-block; border: 1px solid #333; background: #333; color: #fff; border-radius: 8px; padding: 9px 16px; font-size: 14px; text-decoration: none; }
+.bouton-lien:hover { color: #fff; background: #000; }
+.fiche h2 { font-size: 15px; margin: 22px 0 8px; }
+/* environ 8 lignes (8 × 1,5) avant « Afficher plus » */
+.debut { position: relative; max-height: 12em; overflow: hidden; font-size: 14px; line-height: 1.5; color: #333; }
+.debut.ouvert { max-height: none; }
+.debut p { margin: 0 0 0.5em; overflow-wrap: anywhere; }
+.debut.coupe::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3em; background: linear-gradient(rgba(255, 255, 255, 0), #fff); }
+.plus { margin-top: 8px; border: 1px solid #999; background: #fff; color: #333; border-radius: 8px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
 
 /* téléphone : chiffres sous le titre, marges réduites */
 @media (max-width: 600px) {
@@ -61,6 +87,8 @@ blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 12px; font-st
   .barre .bouton { flex: 1; }
   .entete-resultats .tri { margin-left: 0; }
   .suggestions { padding: 14px 16px; }
+  .fiche { padding: 16px; }
+  .fiche h1 { font-size: 19px; }
   .resultat { flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; }
   .chiffres { text-align: left; white-space: normal; display: flex; flex-wrap: wrap; gap: 2px 14px; }
 }

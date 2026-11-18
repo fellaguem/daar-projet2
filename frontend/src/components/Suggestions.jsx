@@ -10,11 +10,12 @@ function couper(titre) {
 
 // Livres proches (voisins dans le graphe de Jaccard), en pastilles avec le titre seul.
 // Sert pour les suggestions de la vue Résultats et pour les livres proches de la vue Livre.
-export default function Suggestions({ titre = 'Suggestions', livres }) {
+export default function Suggestions({ titre = 'Suggestions', sousTitre, livres }) {
   if (!livres || livres.length === 0) return null
   return (
     <section className="carte suggestions">
       <h2>{titre}</h2>
+      {sousTitre && <p className="sous-titre">{sousTitre}</p>}
       <ul className="pastilles">
         {livres.map((l) => (
           <li key={l.id}>
