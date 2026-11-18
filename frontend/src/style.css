@@ -1,12 +1,66 @@
-body { font-family: system-ui, sans-serif; margin: 0; color: #222; background: #fafafa; }
-header { padding: 12px 24px; background: #1d3557; }
-header a { color: white; text-decoration: none; font-weight: bold; }
-main { max-width: 800px; margin: 0 auto; padding: 16px; }
-.barre { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
-.barre input:not([type]) { flex: 1; min-width: 200px; padding: 8px; }
-.barre button { padding: 8px 16px; }
-.auteur { color: #666; }
-.details { font-size: 0.85em; color: #666; }
+/* Couleurs et mesures reprises de la maquette de la vue Résultats (docs/maquette) */
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin: 0; color: #222; background: #eeeeec; }
+a { color: #222; }
+a:hover { color: #000; }
+h1 { font-size: 20px; }
+
+/* en-tête et contenu : même largeur que la maquette (920px) */
+.entete, main { max-width: 920px; margin: 0 auto; padding-left: 32px; padding-right: 32px; box-sizing: border-box; }
+.entete { padding-top: 32px; padding-bottom: 8px; }
+.marque { display: inline-flex; align-items: center; gap: 12px; font-size: 22px; font-weight: 700; text-decoration: none; }
+.logo { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #999; border-radius: 6px; background: #fff; }
+main { padding-top: 16px; padding-bottom: 48px; }
+
+/* cartes blanches (barre, suggestions, liste) */
+.carte { background: #fff; border: 1px solid #999; border-radius: 10px; }
+
+/* barre de recherche (Accueil et Résultats) */
+.barre { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 18px 20px; margin-bottom: 20px; }
+.barre .champ { flex: 999 1 320px; min-width: 0; border: 1px solid #bbb; border-radius: 8px; padding: 10px 14px; font-size: 15px; background: #fafafa; }
+.barre .bouton { border: 1px solid #333; background: #333; color: #fff; border-radius: 8px; padding: 10px 18px; font-size: 14px; cursor: pointer; }
+.barre label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #444; }
 .erreur { color: #b00020; }
-.resultats li { margin-bottom: 10px; }
+
+/* compteur, tri et mots trouvés */
+.entete-resultats { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.compteur { margin: 0; font-size: 14px; color: #333; }
+.entete-resultats .tri { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; }
+.tri select { border: 1px solid #999; border-radius: 6px; padding: 6px 10px; font-size: 13px; background: #fff; color: #333; }
+.mots-trouves { font-size: 13px; color: #444; overflow-wrap: anywhere; }
+
+/* suggestions et livres proches, en pastilles */
+.suggestions { border: 2px solid #333; padding: 16px 20px; margin-top: 16px; }
+.suggestions h2 { font-size: 15px; margin: 0 0 10px; }
+.pastilles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+/* rayon de 16px et non 999px : une pastille qui passe sur deux lignes (téléphone) reste propre */
+.pastille { display: inline-block; border: 1px solid #999; border-radius: 16px; padding: 5px 12px; font-size: 13px; color: #333; background: #fff; }
+.pastille:hover { border-color: #333; color: #000; }
+
+/* liste des résultats */
+.liste { overflow: hidden; margin-top: 16px; }
+.resultats { list-style: none; margin: 0; padding: 0; }
+.resultat { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px dashed #bbb; }
+.resultat:last-child { border-bottom: none; }
+.resultat .livre { min-width: 0; overflow-wrap: anywhere; }
+.resultat .titre { font-weight: 700; color: #222; }
+.auteur { color: #666; }
+.resultat .auteur { font-size: 0.8em; }
+.chiffres { font-size: 12px; color: #555; text-align: right; white-space: nowrap; }
+.voir-plus { display: flex; justify-content: center; padding: 18px; border-top: 1px dashed #bbb; }
+.voir-plus button { border: 1px solid #333; background: #fff; color: #333; border-radius: 8px; padding: 10px 24px; font-size: 14px; cursor: pointer; }
+
+/* page d'un livre */
 blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 12px; font-style: italic; }
+
+/* téléphone : chiffres sous le titre, marges réduites */
+@media (max-width: 600px) {
+  .entete, main { padding-left: 16px; padding-right: 16px; }
+  .entete { padding-top: 16px; }
+  .marque { font-size: 18px; }
+  .barre { padding: 14px; }
+  .barre .bouton { flex: 1; }
+  .entete-resultats .tri { margin-left: 0; }
+  .suggestions { padding: 14px 16px; }
+  .resultat { flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px 16px; }
+  .chiffres { text-align: left; white-space: normal; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+}

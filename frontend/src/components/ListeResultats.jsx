@@ -1,18 +1,53 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
+// nombre de résultats ajoutés à chaque clic sur « Voir plus »
+const PAR_PAGE = 20
+
+// Pertinence relative : score du livre / meilleur score de la recherche, en %.
+// Le score brut est trop petit pour être lu (de 1e-5 à 1e-10).
+function pertinence(score, meilleur) {
+  if (!(meilleur > 0)) return '—'
+  const p = (score / meilleur) * 100
+  return p < 1 ? '< 1 %' : Math.round(p) + ' %'
+}
+
+function pageRank(valeur) {
+  return valeur.toLocaleString('fr-FR', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+}
+
+// Liste classée des livres trouvés, affichée 20 par 20
 export default function ListeResultats({ resultats }) {
-  if (resultats.length === 0) return <p>Aucun livre trouvé.</p>
+  const [nbAffiches, setNbAffiches] = useState(PAR_PAGE)
+  const n = resultats.length
+  // meilleur score de TOUS les résultats, pas seulement des livres affichés :
+  // la pertinence reste juste quand on trie par occurrences ou par PageRank
+  const meilleur = resultats.reduce((max, r) => Math.max(max, r.score), 0)
+
   return (
-    <ol className="resultats">
-      {resultats.map((r) => (
-        <li key={r.id}>
-          <Link to={'/livre/' + r.id}>{r.titre}</Link>
-          <span className="auteur"> — {r.auteur}</span>
-          <div className="details">
-            {r.occurrences} occurrences · PageRank {r.pagerank}
-          </div>
-        </li>
-      ))}
-    </ol>
+    <section className="carte liste">
+      <ol className="resultats">
+        {resultats.slice(0, nbAffiches).map((r, i) => (
+          <li key={r.id} className="resultat">
+            <div className="livre">
+              {i + 1}. <Link className="titre" to={'/livre/' + r.id}>{r.titre}</Link>
+              {r.auteur && <div className="auteur">{r.auteur}</div>}
+            </div>
+            <div className="chiffres">
+              <div>Occurrences : {r.occurrences.toLocaleString('fr-FR')}</div>
+              <div>PageRank : {pageRank(r.pagerank)}</div>
+              <div>Pertinence : {pertinence(r.score, meilleur)}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+      {nbAffiches < n && (
+        <div className="voir-plus">
+          <button type="button" onClick={() => setNbAffiches(nbAffiches + PAR_PAGE)}>
+            Voir plus ({nbAffiches} / {n})
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
