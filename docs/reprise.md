@@ -47,9 +47,9 @@ Gel des fonctionnalités : jeudi 19/11 à midi. Rendu : dimanche 22/11, 23h59.
 ## Reste à faire
 
 - Test sur téléphone (même réseau, ou partage de connexion si le wifi isole les appareils).
-- Mesures sur sous-corpus (100, 400, 800, 1 893 livres) : construire index et graphe sur les N premiers
-  livres, mesurer les temps (moyenne ± écart type) pour les courbes, chauffer la JVM plus longtemps que
-  3 appels (voir notes.md).
+- Courbes du rapport (PNG) à partir de `docs/mesures/*.csv`. Les mesures sont faites (18/11,
+  `recherche.MesureCorpus`, 6 tailles de 100 à 1 893 livres, index contre texte complet) : tableaux et
+  analyse dans `docs/notes.md` (« Mesures sur sous-corpus »).
 - README avec les commandes.
 - Rapport (12 pages environ).
 - Vidéo de 5 min avec la démo sur 2 machines.

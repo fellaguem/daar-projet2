@@ -50,7 +50,7 @@ voisins par nombre de clics (stratégie citée dans l'énoncé).
 
 ## Chiffres et mesures
 
-(rien pour l'instant)
+Courbes du rapport : voir « Mesures sur sous-corpus » à la fin (fichiers CSV dans `docs/mesures/`).
 
 ## Environnement de développement
 
@@ -621,3 +621,136 @@ maquette. Accueil et Livre ne sont pas dans la maquette.
 
 Vérification : captures en largeur ordinateur (1280 px) et téléphone (390 px, émulation mobile de Chrome),
 aucun débordement horizontal sur les 10 pages testées ; 118 tests JUnit verts.
+
+## Mesures sur sous-corpus (`recherche.MesureCorpus`, 18/11/2026)
+
+```
+java -Xmx4g -cp backend/target/classes recherche.MesureCorpus --dossier data --sortie data/mesures
+```
+
+Fichiers (copiés dans `docs/mesures/`, car `data/` n'est pas dans l'archive) : `sous_corpus.csv`,
+`construction.csv`, `requetes.csv`, `index_texte.csv`. Temps en ms, moyenne ± écart type d'échantillon.
+
+**Machine** : portable Intel i7-9750H (6 cœurs, 12 fils), 16 Go, Windows 11, JDK Temurin 17.0.21,
+`-Xmx4g`, sur secteur, serveur et front arrêtés. Une exécution du programme, 7 min 15 s.
+
+**Protocole**
+- Sous-corpus : les 1 893 livres (par identifiant) mélangés une fois avec la graine 42, puis les N premiers
+  de cet ordre : sous-corpus emboîtés, reproductibles et représentatifs (0,46 Mo par livre pour N = 100,
+  0,44 sur tout le corpus).
+- Tout est construit en mémoire avec les classes et réglages du vrai pipeline ; rien n'est écrit dans
+  `data/` sauf les CSV.
+- Index : 1 construction de chauffe puis 5 mesurées (lecture des fichiers comprise, déjà dans le cache du
+  système après la chauffe). Puis l'index est sauvé dans un fichier temporaire et rechargé, comme le serveur
+  le charge (voir « Piège de mesure » plus bas).
+- Graphe : 1 + 10, en 4 temps (empreintes, distances, graphe, PageRank). Mots vides recalculés pour les
+  N livres ; seuil pour un degré moyen de 10, la règle du vrai graphe : il dépend donc de N (0,9648 pour
+  100 livres, 0,9154 pour 1 893). Un seuil fixe de 0,9154 donnerait un degré moyen d'environ 0,5 sur
+  100 livres : on ne mesurerait plus la même application.
+- Requêtes : moteur complet (recherche, classement, suggestions), sans HTTP ; 2 s de chauffe (au lieu des
+  3 appels de `MesureRegex`, insuffisants), puis 30 tours, chaque tour dans un ordre mélangé.
+- Index contre texte complet (N ≤ 800) : 3 regex en mot entier, `RechercheRegex` seule ; index 3 + 30,
+  texte 1 + 5 (plusieurs secondes par requête), textes chargés en mémoire avant de chronométrer.
+
+### Sous-corpus
+
+| N | Mo de texte | mots indexés | vocabulaire | postings | paires | seuil | arêtes | isolés | itérations PageRank |
+|---|---|---|---|---|---|---|---|---|---|
+| 100 | 46 | 7,7 M | 93 717 | 0,70 M | 4 950 | 0,9648 | 476 | 4 | 61 |
+| 200 | 84 | 14,0 M | 120 642 | 1,31 M | 19 900 | 0,9540 | 866 | 9 | 66 |
+| 400 | 170 | 28,4 M | 177 741 | 2,60 M | 79 800 | 0,9429 | 1 744 | 24 | 82 |
+| 800 | 338 | 56,5 M | 241 655 | 5,10 M | 319 600 | 0,9316 | 3 569 | 59 | 105 |
+| 1 200 | 522 | 87,1 M | 306 273 | 7,75 M | 719 400 | 0,9247 | 5 495 | 141 | 109 |
+| 1 893 | 829 | 137,9 M | 415 869 | 12,39 M | 1 790 778 | 0,9154 | 8 823 | 270 | 107 |
+
+(Mo = 10⁶ octets.) Le vocabulaire suit la loi de Heaps : V ≈ K · mots^β avec β ≈ 0,52 (entre 100 et
+1 893 livres : mots × 18, vocabulaire × 4,4). C'est ce qui rend la regex dans l'index peu sensible à N.
+
+### Construction (hors ligne)
+
+| N | index (5 essais) | empreintes | distances | graphe | PageRank |
+|---|---|---|---|---|---|
+| 100 | 1 099 ± 99 | 9,4 ± 3,3 | 0,29 ± 0,06 | 0,73 ± 0,20 | 0,19 ± 0,20 |
+| 200 | 1 898 ± 33 | 11,7 ± 1,5 | 0,50 ± 0,20 | 0,89 ± 0,23 | 0,13 ± 0,00 |
+| 400 | 3 808 ± 33 | 19,1 ± 2,2 | 1,84 ± 1,39 | 1,61 ± 0,10 | 0,30 ± 0,03 |
+| 800 | 7 465 ± 27 | 34,7 ± 2,2 | 6,95 ± 0,42 | 6,11 ± 1,05 | 0,73 ± 0,09 |
+| 1 200 | 11 668 ± 121 | 54,7 ± 5,0 | 20,4 ± 2,0 | 13,5 ± 1,2 | 1,25 ± 0,10 |
+| 1 893 | 18 714 ± 291 | 90,9 ± 8,1 | 64,7 ± 1,7 | 35,4 ± 1,9 | 2,50 ± 0,13 |
+
+- **Index : linéaire**, 132 à 144 ms par million de mots (environ 23 ms par Mo). C'est 99 % du temps hors
+  ligne : le découpage en mots et la table de hachage, pas le graphe.
+- **Empreintes : linéaires** en nombre de postings (7 ns par posting).
+- **Distances : quadratiques**. De 800 à 1 893 livres, les paires sont multipliées par 5,6 et le temps par
+  9,3 : le coût d'une paire grandit aussi (22 ns → 36 ns), car les vecteurs de bits s'allongent (un bit par
+  mot partagé) et sortent du cache. Calcul en parallèle sur 12 fils.
+- Graphe : surtout le tri de toutes les distances pour trouver le seuil (n log n sur les paires).
+- PageRank : négligeable (2,5 ms pour 107 itérations sur 8 823 arêtes).
+
+### Requêtes (moteur complet, sans HTTP)
+
+| N | `whale` | `love` | `the` | `white whale` | regex `whale` | regex `s(a\|g\|r)*on` | regex `.*ing` | regex `.*` |
+|---|---|---|---|---|---|---|---|---|
+| 100 | 0,017 | 0,061 | 0,066 | 0,020 | 0,91 | 1,02 | 3,9 | 8,8 |
+| 200 | 0,017 | 0,092 | 0,104 | 0,020 | 0,94 | 1,07 | 4,6 | 11,8 |
+| 400 | 0,024 | 0,186 | 0,204 | 0,028 | 1,44 | 1,63 | 6,8 | 19,8 |
+| 800 | 0,053 | 0,420 | 0,434 | 0,059 | 2,26 | 2,41 | 10,9 | 34,4 |
+| 1 200 | 0,085 | 0,909 * | 0,629 | 0,093 | 1,89 | 3,52 * | 11,6 | 44,2 |
+| 1 893 | 0,127 | 0,999 | 1,082 | 0,153 | 2,67 | 3,19 | 17,6 | 77,2 |
+
+Écarts types dans `requetes.csv` (en général 5 à 25 % de la moyenne, plus pour `.*`). \* : un des 30 essais a subi une
+pause (ramasse-miettes probablement) : écart type 1,6 ms pour `love`, 6,9 ms pour `s(a|g|r)*on` (et 5,9 ms
+pour `a.*b`, même N). La moyenne y est tirée vers le haut ; à signaler sur les courbes.
+- **Mot-clef : moins de 1,1 ms**, proportionnel au nombre de livres trouvés (environ 0,55 µs par résultat :
+  score, tri, suggestions). La recherche du mot elle-même (dichotomie) est négligeable.
+- **Regex dans l'index : suit la taille du vocabulaire**, pas celle du texte. `whale` passe de 0,9 à 2,7 ms
+  quand le vocabulaire est multiplié par 4,4 (environ 0,5 ms pour l'automate + 5 ns par mot). `.*ing`
+  (11 916 mots) et `.*` (tous les mots, 12,4 M postings) coûtent surtout le regroupement des postings et le
+  classement de tous les livres.
+- Le 13/11, `MesureRegex` donnait 6,1 ± 2,0 ms pour `whale` en mot entier, avec 3 appels de chauffe :
+  2,7 ± 0,15 ms ici avec 2 s de chauffe, moteur complet compris.
+
+### Regex : index contre texte complet
+
+Même découpage (`Index.pourChaqueMotIndexable`), même automate (`MatcherTable`, mot entier) : seule
+l'utilisation de l'index change. Les deux trouvent **les mêmes livres avec les mêmes nombres
+d'occurrences** à chaque mesure (vérifié par le programme, et par `MesureCorpusTest` sur les regex de test
+du projet 1).
+
+| N | Mo | `wh(a\|e)le` index | texte | rapport | `.*ing` index | texte | rapport |
+|---|---|---|---|---|---|---|---|
+| 100 | 46 | 0,71 ± 0,04 | 519 ± 34 | × 730 | 2,55 ± 0,03 | 588 ± 29 | × 230 |
+| 200 | 84 | 0,72 ± 0,02 | 967 ± 33 | × 1 340 | 3,79 ± 0,12 | 1 048 ± 37 | × 280 |
+| 400 | 170 | 1,11 ± 0,06 | 1 907 ± 75 | × 1 720 | 5,44 ± 0,11 | 2 129 ± 90 | × 390 |
+| 800 | 338 | 1,72 ± 0,10 | 3 741 ± 74 | × 2 180 | 8,62 ± 0,27 | 4 229 ± 34 | × 490 |
+
+(`(sh|wh)(a|o)(l|r)(e|k)` : 1,15 / 511 ; 0,82 / 957 ; 1,30 / 1 890 ; 2,11 / 3 845 ms.)
+- **Texte complet : linéaire** en taille du texte, 11 ms par Mo (11 ns par caractère), quelle que soit la
+  regex. Extrapolé à 1 893 livres : environ 9 s par requête, contre 2,7 ms dans l'index.
+- **L'écart grandit avec N** : le texte grandit comme le nombre de mots, le vocabulaire bien moins vite
+  (Heaps).
+- Pour mémoire, le texte brut ligne par ligne à la manière d'egrep (projet 1 tel quel, `MatcherUnePasse`) :
+  39 ns par caractère sur les 20 livres de test (plus haut). Notre variante texte (découpage puis tableau)
+  est 3,5 fois plus rapide, et reste 3 ordres de grandeur derrière l'index.
+
+### Piège de mesure : index construit en mémoire ou rechargé
+
+Première exécution (index utilisé tel que construit) : regex 3 à 5 fois plus lentes. Essai sur le même
+index de 1 893 livres (`RechercheRegex` seule, 30 essais après 20 de chauffe) :
+
+| | `whale` | `.*ing` |
+|---|---|---|
+| construit en mémoire | 14,6 ms | 45,3 ms |
+| sauvé puis rechargé | 2,8 ms | 13,7 ms |
+| `data/index.bin` du serveur | 3,2 ms | 15,1 ms |
+
+Cause probable : la regex lit les 415 869 mots dans l'ordre alphabétique. Rechargés depuis le fichier, ils
+sont créés dans cet ordre, côte à côte en mémoire ; construits pendant la lecture des livres, ils sont
+éparpillés (défauts de cache). Le serveur charge `index.bin` : `MesureCorpus` sauve et recharge donc
+l'index avant de mesurer, et seule la seconde exécution est gardée. À citer dans le rapport : la
+disposition en mémoire compte autant que l'algorithme.
+
+**Limites** : une seule exécution du programme ; portable (fréquence variable selon la chaleur) ; moyenne
+sensible aux pauses du ramasse-miettes (3 points à N = 1 200) ; fichiers déjà dans le cache du système.
+
+Code : `MesureCorpus` (nouveau) ; `RechercheRegex.construireAutomate` n'est plus `private` (visible dans le
+paquet, pour le mode texte). Tests : `MesureCorpusTest` (2). Suite complète : 120 tests.
