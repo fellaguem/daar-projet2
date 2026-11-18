@@ -94,7 +94,8 @@ public final class RechercheRegex {
     }
 
     // regex -> AFD minimal de "regex" (mot entier) ou de ".*regex" (sous-chaîne)
-    private static Afd construireAutomate(String regex, boolean motEntier) {
+    // (aussi utilisée par MesureCorpus, pour chercher dans le texte complet avec le même automate)
+    static Afd construireAutomate(String regex, boolean motEntier) {
         String r = regex == null ? "" : regex.strip();
         if (r.isEmpty()) {
             throw new RegexInvalide("La regex est vide.");
