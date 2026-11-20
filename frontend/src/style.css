@@ -11,7 +11,10 @@ h1 { font-size: 20px; }
 .logo { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #999; border-radius: 6px; background: #fff; }
 main { padding-top: 16px; padding-bottom: 48px; }
 
-/* accueil : présentation et exemples cliquables */
+/* accueil : présentation et exemples cliquables.
+   Le bloc prend la hauteur de l'écran moins l'en-tête (84px) et les marges de main (64px),
+   et se place au milieu ; le padding du bas le remonte un peu (pile au centre, il paraît trop bas). */
+.accueil { min-height: calc(100vh - 148px); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding-bottom: 8vh; }
 .accueil h1 { font-size: 24px; margin: 24px 0 8px; }
 .accueil .intro { color: #444; line-height: 1.5; margin: 0 0 20px; max-width: 680px; }
 .exemples { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 14px; color: #444; }
@@ -83,6 +86,8 @@ main { padding-top: 16px; padding-bottom: 48px; }
   .entete, main { padding-left: 16px; padding-right: 16px; }
   .entete { padding-top: 16px; }
   .marque { font-size: 18px; }
+  /* pas de centrage vertical sur téléphone : l'écran est petit et le clavier en cache la moitié */
+  .accueil { min-height: 0; padding-bottom: 0; }
   .barre { padding: 14px; }
   .barre .bouton { flex: 1; }
   .entete-resultats .tri { margin-left: 0; }

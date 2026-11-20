@@ -88,7 +88,11 @@ export default function Livre() {
             {/* la clé remet « Afficher plus » à zéro quand on passe à un autre livre */}
             <DebutDuLivre key={livre.id} extrait={livre.extrait} />
           </article>
-          <Suggestions titre="Livres proches" livres={livre.voisins} />
+          <Suggestions
+            titre="Livres proches"
+            sousTitre="Voisins de ce livre dans le graphe de Jaccard (livres au vocabulaire proche)"
+            livres={livre.voisins}
+          />
         </>
       )}
     </>
