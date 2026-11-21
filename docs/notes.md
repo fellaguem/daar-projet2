@@ -1,6 +1,8 @@
 # Notes pour le rapport
 
-Choix et chiffres à reprendre dans le rapport. On complète au fil de l'eau.
+Journal des choix et des chiffres pour le rapport, dans l'ordre où ils ont été faits (12 au 20/11/2026).
+Les sections datées gardent les chiffres du moment (par exemple 1 900 livres avant le retrait des
+doublons) ; les décisions finales sont résumées dans « Choix de conception ».
 
 ## Choix de conception
 
@@ -22,35 +24,38 @@ langue est `en`. On le dit dans le rapport avec la provenance des fichiers.
 ### Recherche par mot-clef : recherche exacte dans l'index
 
 L'énoncé demande les livres dont la table d'indexage contient la chaîne S. C'est
-une recherche dans l'index (mot exact), pas un balayage de texte : KMP n'est
-pas utilisé ici. KMP reste utile pour l'extrait d'un livre et pour la variante
-« texte complet » de la recherche avancée.
+une recherche dans l'index (mot exact, dichotomie sur le vocabulaire), pas un
+balayage de texte. KMP (projet 1) n'est utilisé nulle part dans le projet 2 :
+l'index le rend inutile. L'extrait d'un livre lit simplement le début du fichier,
+et la variante « texte complet » (mesures seulement) teste l'automate sur chaque mot.
 
-### Classement : occurrences normalisées × PageRank (point de départ)
+### Classement : occurrences normalisées × PageRank
 
-- Occurrences normalisées : nombre d'occurrences du mot divisé par la longueur
-  du livre. Sinon les gros livres gagnent toujours.
+- score = (occurrences des mots non vides / nombre de mots du livre) × PageRank.
+- Diviser par la longueur du livre : sinon les gros livres gagnent toujours.
 - PageRank : importance du livre dans le graphe de Jaccard, calculée une fois
   hors ligne, indépendante de la requête.
-- Le produit des deux donne le score. À comparer dans le rapport avec
-  « occurrences seules » et « PageRank seul ».
+- Le menu de tri compare avec « occurrences seules » et « PageRank seul ».
 
 ### Suggestions
 
-Voisins dans le graphe de Jaccard des 2-3 meilleurs résultats, sans les
-doublons avec la liste des résultats. Bonus possible plus tard : classer ces
-voisins par nombre de clics (stratégie citée dans l'énoncé).
+Voisins dans le graphe de Jaccard des 3 premiers résultats qui ont des voisins
+(cherchés parmi les 10 premiers), sauf ces 3 livres ; on garde les 10 plus proches.
+Le classement par nombre de clics, cité dans l'énoncé, n'a pas été fait (hors énoncé
+obligatoire, abandonné le 18/11).
 
-## Questions encore ouvertes
+## Questions tranchées
 
-- Mots vides : comment les traiter (piste : les garder dans l'index mais les
-  ignorer dans le classement).
-- Regex : mot entier ou sous-chaîne ? Traducteur pour `+ ? [ ]` ?
-- Build du front dans l'archive de 30 Mo : commité ou reconstruit ?
+- Mots vides (présents dans plus de 50 % des livres) : gardés dans l'index,
+  ignorés dans le classement et dans le graphe de Jaccard.
+- Regex : mot entier par défaut (`motEntier=true`) ; parseur du projet 1 étendu
+  avec `+ ? [a-z]`.
+- Build du front : ni dans git ni dans l'archive, reconstruit par `npm run build` (README).
 
 ## Chiffres et mesures
 
-Courbes du rapport : voir « Mesures sur sous-corpus » à la fin (fichiers CSV dans `docs/mesures/`).
+Courbes du rapport : voir « Mesures sur sous-corpus » à la fin (fichiers CSV dans `docs/mesures/`,
+5 figures dans `docs/mesures/figures/`, tracées par `docs/mesures/courbes.py`).
 
 ## Environnement de développement
 
@@ -60,7 +65,7 @@ Courbes du rapport : voir « Mesures sur sous-corpus » à la fin (fichiers CSV 
 - Le projet 1 (packages parser, ast, automate, kmp, experimentation) est copié
   tel quel dans `backend/src/main/java` ; il compile avec Java 17.
 - Le build du front va dans `backend/src/main/resources/static`, ignoré par git
-  (régénéré par `npm run build`). À décider : l'inclure ou non dans l'archive.
+  (régénéré par `npm run build`) et absent de l'archive.
 
 ## Tests du projet 1 (référence avant toute modification)
 
@@ -74,7 +79,8 @@ code du projet 1 non modifié (`mvnw test`, 13/11/2026) :
 | AutomatesProjet1Test (naïf contre une passe) | 3 490 440 | 0 | 13 s |
 
 Les mêmes chiffres que dans le README du projet 1. On relance ces tests après
-chaque modification de `parser`, `automate`, `kmp` ou `experimentation`.
+chaque modification de `parser`, `automate`, `kmp` ou `experimentation` (chiffres après
+l'extension du parseur : voir « Projet 1 étendu »).
 Non repris : TestPerformance et TestPireCas (des mesures, pas des tests).
 
 ## Corpus : script de téléchargement (`corpus.TelechargeCorpus`)
@@ -91,8 +97,8 @@ pause entre deux téléchargements, retrait de l'en-tête et de la licence (marq
 livres déjà traités. Il écrit `metadonnees.tsv` (id, titre, auteur, langue, URL, nombre de mots)
 et `rejetes.tsv` (id, raison).
 
-Lancer : `.\mvnw.cmd compile` dans backend, puis, depuis la racine,
-`java -cp backend/target/classes corpus.TelechargeCorpus --max 1750 --pause 1500`.
+Lancer (après la compilation, voir README) :
+`java -cp backend/target/classes corpus.TelechargeCorpus --max 1900 --pause 1500`.
 
 Tokeniseur : un mot = une suite de lettres, en minuscules. Les apostrophes, tirets et
 chiffres séparent les mots (« don't » donne « don » et « t »).
@@ -101,7 +107,8 @@ Test sur 20 livres (`data/test20`) : 30 téléchargements pour 20 livres gardés
 car trop courts (300 à 5 294 mots). 22 Mo pour 20 livres, soit environ 1,1 Mo par livre
 (la Bible fait 4,5 Mo) : prévoir environ 1,5 à 2 Go pour 1 750 livres.
 
-Problèmes vus sur ce test, à traiter avant le téléchargement complet :
+Problèmes vus sur ce test, traités avant le téléchargement complet (filtres ci-dessous, puis
+`corpus.RetraitDoublons`) :
 - doublons : la Bible (10 et 30), Paradise Lost (20 et 26), le CIA World Factbook (14 et 25).
   Deux livres identiques ont une distance de Jaccard de 0 : ils faussent le graphe.
 - livres qui n'en sont pas : CIA World Factbook, recensement américain, Roget's Thesaurus.
@@ -131,23 +138,24 @@ et `longueurs[]` par livre. Mot exact : dichotomie sur `mots[]`. Occurrences d'u
 dichotomie sur les postings du mot. Fichier binaire unique (`data/index.bin`, format « IDX2 »).
 
 Choix :
-- Les mots vides restent dans l'index (chercher « the » doit marcher). Ils seront retirés du graphe
-  de Jaccard et du classement, avec un seuil automatique (mots présents dans plus de X % des livres,
-  X à fixer) plutôt qu'une liste écrite à la main. Dans Jaccard on retirera aussi les mots présents
-  dans un seul livre (ils ne changent pas l'intersection et allègent les vecteurs de bits).
+- Les mots vides restent dans l'index (chercher « the » doit marcher). Ils sont retirés du graphe
+  de Jaccard et du classement, avec un seuil automatique (mots présents dans plus de 50 % des livres)
+  plutôt qu'une liste écrite à la main. Dans Jaccard, les mots présents dans un seul livre n'ont pas
+  de bit (ils ne peuvent pas être dans une intersection), voir « Graphe de Jaccard ».
 - Les mots d'une lettre ne sont pas indexés (« whale's » donne « whale », les « s » et « t » isolés
   disparaissent). C'est fait dans l'index et pour les requêtes, pas dans le tokeniseur : le seuil de
   10 000 mots du corpus compte tous les mots. `longueurLivre` compte les mots indexés.
 - Limite à noter : « don't » est lu « don ».
 - Recherche à plusieurs mots : ET (livres contenant tous les mots), score = somme des occurrences
   (`recherche.RechercheIndex`). On parcourt les postings du mot le plus rare et on vérifie les autres
-  par dichotomie. La recherche par regex sera un OU : un livre est retenu s'il contient au moins un
+  par dichotomie. La recherche par regex est un OU : un livre est retenu s'il contient au moins un
   mot du vocabulaire qui vérifie la regex.
 
 Mesure sur les 20 livres de test (`data/test20`) : 71 959 mots différents, 191 597 postings,
 construction + sauvegarde 0,8 s, fichier de 2 Mo.
 
-Mesure sur le vrai corpus (13/11/2026, 1 900 livres, 794 Mo de texte, `-Xmx2g`, une seule exécution) :
+Mesure sur le vrai corpus (13/11/2026, 1 900 livres avant le retrait des doublons, 794 Mo de texte,
+`-Xmx2g`, une seule exécution ; corpus final et temps répétés : voir « Mesures sur sous-corpus ») :
 
 | | |
 |---|---|
@@ -167,14 +175,15 @@ Tests : `IndexTest` (11), `RechercheIndexTest` (7), `TokeniseurTest` (6).
 
 ## Recherche avancée par regex, mode index (`recherche.RechercheRegex`)
 
-Principe : regex minuscule -> `Parser` -> `MatcherUnePasse.envelopper` (`.*R`, donc recherche d'une
-sous-chaîne comme egrep) -> AFD minimal (projet 1) -> test sur chaque mot du vocabulaire -> union des
-livres de ces mots (OU), score = somme des occurrences des mots trouvés. Réponse : livres triés,
-nombre de mots trouvés, 50 premiers mots (ordre alphabétique).
+Principe : regex minuscule -> `Parser` -> AFD minimal (projet 1) -> test sur chaque mot du
+vocabulaire -> union des livres de ces mots (OU), score = somme des occurrences des mots trouvés.
+Réponse : livres triés, nombre de mots trouvés, 50 premiers mots (ordre alphabétique).
+Première version (13/11) : `MatcherUnePasse.envelopper` (`.*R`), donc recherche d'une sous-chaîne
+comme egrep ; le mot entier est devenu le défaut le jour même (voir « Mot entier par défaut »).
 
-Refusées avec un message (RegexInvalide, code 400 côté API) : regex vide, plus de 100 caractères,
-mal écrite, qui accepte le mot vide (`a*`, `a|`, `(a|b)*` : elle trouverait tous les livres), ou dont
-l'AFD dépasse 2 000 états.
+Refusées avec un message (`RegexInvalide`, code 400 côté API) : regex vide, plus de 100 caractères,
+mal écrite, ou dont l'AFD dépasse 2 000 états. En sous-chaîne seulement (`motEntier=false`), aussi
+une regex qui accepte le mot vide (`a*`, `a|`, `(a|b)*` : elle trouverait tous les livres).
 
 ### Explosion du nombre d'états (mesures du 13/11/2026)
 
@@ -274,8 +283,8 @@ Par le serveur (moteur complet, classement et suggestions) : `.*` 100 à 120 ms,
 
 **Attention pour les courbes** : la sous-chaîne mesurée ici (11 à 16 ms) est bien plus rapide que la
 mesure du matin (31 à 40 ms, programme lancé à froid). Seule différence : la JVM a déjà été chauffée par
-les mesures en mot entier. 3 appels de chauffe ne suffisent pas ; pour le rapport, chauffer plus
-longtemps (par exemple 2 s de requêtes) et mesurer chaque série dans un ordre varié.
+les mesures en mot entier. 3 appels de chauffe ne suffisent pas. Corrigé le 18/11 dans
+`MesureCorpus` : 2 s de chauffe, puis chaque tour de requêtes dans un ordre mélangé.
 
 ## Projet 1 étendu (modifications du code copié dans backend/)
 
@@ -308,7 +317,7 @@ Mots pris en compte (décidé le 13/11/2026) :
   pas de bit, ils sont seulement comptés dans la taille |A|. La distance est exactement celle des
   ensembles complets (vérifié par `JaccardTest` contre un calcul avec des `HashSet`, sur les 14 textes
   du projet 1 et sur 20 petits corpus aléatoires), avec des vecteurs de bits bien plus petits.
-  Effet à discuter : un livre plein de mots rares est plus loin de tous les autres.
+  À discuter dans le rapport : un livre plein de mots rares est plus loin de tous les autres.
 - deux livres sans aucun mot gardé ont une distance de 1 (pas d'information).
 
 Calcul : un vecteur de bits (long[]) par livre sur les mots partagés ; |A ∩ B| = bitCount(A ET B),
@@ -321,13 +330,14 @@ Graphe : arête si d < seuil (strictement). Seuil donné (`--seuil`) ou déduit 
 Fichiers : graphe.bin, aretes.csv (liste d'arêtes), pagerank.bin, pagerank.csv, mesures/distances_histogramme.csv.
 
 PageRank : classique (non pondéré), itération de la puissance, amortissement 0,85, arrêt quand la somme
-des |PR' - PR| < 1e-10 (100 itérations au plus). Le score des livres isolés est redistribué
+des |PR' - PR| < 1e-10 (200 itérations au plus, 100 au début). Le score des livres isolés est redistribué
 uniformément à tous les livres (la somme reste 1). Vérifié par `PageRankTest` : cycle uniforme, centre
 d'étoile, formule exacte avec un isolé (y = (1-a)/(3-a)), et calcul matriciel naïf sur 30 graphes
-aléatoires (écart < 1e-10). Version pondérée par la similarité : bonus, si on a le temps.
+aléatoires (écart < 1e-10). Version pondérée par la similarité : pas faite (perspective).
 
-Point ouvert (à décider après l'histogramme du vrai corpus) : livres isolés acceptés tels quels, ou
-garantir à chaque livre ses 3 plus proches voisins.
+Livres isolés (décidé le 13/11/2026) : gardés tels quels dans le graphe ; les suggestions prennent les
+premiers résultats qui ont des voisins (voir « Suggestions : repli pour les livres isolés »). Option
+non retenue : garantir à chaque livre ses 3 plus proches voisins.
 
 ### Essai sur les 20 livres de test (pas une calibration)
 
@@ -349,6 +359,9 @@ Seuil 0,9879 pour un degré moyen de 10 (avec 20 livres, la moitié des paires),
 Tests : JaccardTest (8), GrapheTest (7), PageRankTest (8), MetadonneesTest (1). Suite complète : 85 tests.
 
 ### Premier calcul sur le vrai corpus (13/11/2026, 1 900 livres, réglages par défaut)
+
+Version abandonnée (tous les mots de chaque livre) : elle a révélé le biais de longueur. Le graphe
+final utilise l'empreinte de 250 mots (voir « Empreinte » plus bas).
 
 1 804 050 paires. Mots : 185 698 partagés (un bit chacun), 227 559 dans un seul livre, 3 018 mots vides
 retirés (plus de 50 % des livres). Vecteurs de bits 44,1 Mo (95 ms), distances 1,7 s sur 12 cœurs,
@@ -405,7 +418,8 @@ recueils différents des Sonnets) : le seuil 0,13 sépare nettement doublons et 
 Les fichiers sont déplacés dans `data/doublons/` (rien n'est supprimé), les livres retirés de
 `metadonnees.tsv` et ajoutés à `rejetes.tsv`. **Corpus final : 1 893 livres** (≥ 1 664).
 Index reconstruit : 415 869 mots, 12 390 627 postings, 100 Mo (55 s cette fois contre 22 s la première :
-une mesure isolée ne suffit pas, à répéter pour les courbes).
+une mesure isolée ne suffit pas ; répété le 18/11 : 18,7 ± 0,3 s sur 5 essais, voir « Mesures sur
+sous-corpus »).
 
 ### Empreinte : les K mots les plus fréquents de chaque livre (décision du point 5)
 
@@ -427,7 +441,8 @@ Comparaison (1 893 livres, degré moyen visé 10, mots vides à 50 %) :
 Avec moins de mots vides (seuil à 20 % ou 10 % des livres), le gain est faible : 277 à 320 isolés,
 corrélation 0,21 à 0,31. On garde 50 %, la même définition que pour le classement du moteur.
 Environ 270 livres (14 %) restent isolés quel que soit le réglage : des livres sans vrai voisin dans
-le corpus (une option à discuter si besoin : relier aussi chaque livre à son plus proche voisin).
+le corpus. Ils sont gardés tels quels ; option non retenue, à citer en perspective : relier aussi
+chaque livre à son plus proche voisin.
 
 **Choix : K = 250** (`ConstructionGraphe.MOTS_PAR_LIVRE_DEFAUT`). Les voisins deviennent thématiques :
 
@@ -446,13 +461,45 @@ Graphe final (K = 250) : 29 387 mots partagés, vecteurs de bits 7,0 Mo (contre 
 degré 0,82. En tête : Gutenberg Encyclopedia vol. 1, Bulchevy's Book of English Verse, Critical and
 Historical Essays : des recueils variés, au centre du graphe, ce qui est attendu pour une centralité.
 
+### Top 10 du PageRank (20/11/2026)
+
+Calculé depuis `data/pagerank.csv` et `data/metadonnees.tsv` (1 893 livres, K = 250, seuil 0,9154).
+Nombre de mots : tous les mots du livre (`Tokeniseur.compter`, la longueur du filtre des 10 000 mots).
+Rang par degré entre parenthèses (1 = le plus de voisins).
+
+| Rang | Titre | Auteur | PageRank | Degré | Mots |
+|---|---|---|---|---|---|
+| 1 | The Project Gutenberg Encyclopedia, Volume 1 of 28 | Project Gutenberg | 0,002708 | 61 (2e) | 1 315 683 |
+| 2 | Bulchevy's Book of English Verse | Quiller-Couch, Arthur (éd.) | 0,002409 | 62 (1er) | 202 680 |
+| 3 | Critical and Historical Essays — Volume 2 | Macaulay, Thomas Babington | 0,002213 | 53 (4e) | 297 587 |
+| 4 | The Song of the Lark | Cather, Willa | 0,002185 | 38 (66e) | 155 576 |
+| 5 | The Deliverance: A Romance of the Virginia Tobacco Fields | Glasgow, Ellen | 0,002100 | 37 (74e) | 140 051 |
+| 6 | Poems: Patriotic, Religious, Miscellaneous | Ryan, Abram Joseph | 0,002024 | 50 (5e) | 65 268 |
+| 7 | The Flower of the Mind | Meynell, Alice | 0,002003 | 56 (3e) | 73 872 |
+| 8 | The Story of Mankind | Van Loon, Hendrik Willem | 0,001987 | 49 (7e) | 129 953 |
+| 9 | The Ambassadors | James, Henry | 0,001911 | 14 (447e) | 169 226 |
+| 10 | The Valley of the Moon | London, Jack | 0,001895 | 37 (74e) | 174 581 |
+
+Livre isolé (270 livres, degré 0) : PageRank 0,000090, le même pour les 270, et le plus petit du
+corpus (un isolé ne reçoit que la part fixe de 15 % et la part redistribuée des isolés).
+Moyenne : 1 / 1 893 = 0,000528. Le premier a 30 fois le PageRank d'un livre isolé.
+
+À retenir pour le rapport :
+- 6 des 10 premiers sont parmi les 7 plus forts degrés : encyclopédie, anthologies de poèmes, essais,
+  histoire générale. Des recueils variés partagent du vocabulaire avec beaucoup de livres
+  (corrélation PageRank / degré 0,82).
+- Le PageRank n'est pas seulement le degré : *The Ambassadors* est 9e avec 14 voisins (447e par le
+  degré). Ses voisins ont peu d'autres voisins (4,2 en moyenne, contre 9,3 pour tout le graphe) :
+  chacun lui donne donc une grande part de son score.
+
 ### Serveur sur le vrai corpus (13/11/2026)
 
 Démarrage 6,9 s, 297 Mo en mémoire. « whale » : 282 livres ; `produit` : Moby-Dick, Cruise of the
 Cachalot, South Sea Tales ; suggestions : Adventure, Two Years Before the Mast, The Mirror of the Sea,
 The Sea-Wolf… `pagerank` met en tête des livres qui ne citent le mot qu'une à quatre fois (l'encyclopédie) :
-c'est pour cela que le tri par défaut est le produit. Regex `wh(a|e)le` : 30 mots, 414 livres,
-759 ms au premier appel (à mesurer à chaud pour les courbes ; 14 à 22 ms sur test20).
+c'est pour cela que le tri par défaut est le produit. Regex `wh(a|e)le` en sous-chaîne (avant le mot
+entier par défaut) : 30 mots, 414 livres, 759 ms au premier appel, JVM froide. Corrigé ensuite par la
+chauffe au démarrage (ci-dessous) ; temps à chaud : voir « Mesures sur sous-corpus ».
 
 ### Démarrage à chaud (13/11/2026)
 
@@ -516,8 +563,8 @@ courant (présent dans presque tous les livres) ne laisserait aucune suggestion.
 Tous les résultats sont renvoyés (le front pagine). `tempsMs` = temps du moteur seul (recherche, classement,
 suggestions), sans réseau ni JSON, en ms avec 2 décimales.
 
-Erreurs : 400 `{ "erreur": "..." }` (requête vide, regex invalide, tri ou mode inconnu, mode texte pas encore
-disponible), 404 (livre inconnu). `DonneesFactices.java` supprimé ; le mode données factices reste dans le front.
+Erreurs : 400 `{ "erreur": "..." }` (requête vide, regex invalide, tri ou mode inconnu, mode texte réservé
+aux mesures), 404 (livre inconnu). `DonneesFactices.java` supprimé ; le mode données factices reste dans le front.
 
 Essai sur data/test20 (serveur réel) : « white whale » -> 5 livres en 3,95 ms, Moby-Dick en tête
 (1 526 occurrences, score 4,2e-4, loin devant). Les trois tris donnent des ordres différents :
@@ -580,8 +627,8 @@ Requêtes testées sur le serveur réel (jar reconstruit, 1 893 livres, adresses
 Test de charge : 20 recherches par mot-clef différentes, envoyées **en même temps** (curl en parallèle)
 **depuis la machine serveur vers sa propre adresse sur le réseau local** : 20 réponses 200 en 0,7 s au
 total. Ce n'est **pas** le test sur plusieurs machines : les requêtes partent toutes de la même machine.
-Un essai depuis un deuxième PC a été fait le 17/11 (version précédente du front) ; le test depuis un
-téléphone reste à faire.
+Un essai depuis un deuxième PC a été fait le 17/11 (version précédente du front). Essai depuis un
+téléphone le 20/11 (même Wi-Fi, `http://IP-du-serveur:8080`) : résultat à noter ici.
 
 Suite JUnit : 118 tests, tous verts (inchangée, aucun code Java modifié).
 
@@ -663,8 +710,9 @@ Fichiers (copiés dans `docs/mesures/`, car `data/` n'est pas dans l'archive) : 
 | 1 200 | 522 | 87,1 M | 306 273 | 7,75 M | 719 400 | 0,9247 | 5 495 | 141 | 109 |
 | 1 893 | 829 | 137,9 M | 415 869 | 12,39 M | 1 790 778 | 0,9154 | 8 823 | 270 | 107 |
 
-(Mo = 10⁶ octets.) Le vocabulaire suit la loi de Heaps : V ≈ K · mots^β avec β ≈ 0,52 (entre 100 et
-1 893 livres : mots × 18, vocabulaire × 4,4). C'est ce qui rend la regex dans l'index peu sensible à N.
+(Mo = 10⁶ octets.) Le vocabulaire suit la loi de Heaps : V ≈ K · mots^β avec β ≈ 0,51 (régression
+sur les 6 points dans `courbes.py` : β = 0,509 ; entre 100 et 1 893 livres : mots × 18, vocabulaire × 4,4).
+C'est ce qui rend la regex dans l'index peu sensible à N.
 
 ### Construction (hors ligne)
 
@@ -754,3 +802,18 @@ sensible aux pauses du ramasse-miettes (3 points à N = 1 200) ; fichiers déjà
 
 Code : `MesureCorpus` (nouveau) ; `RechercheRegex.construireAutomate` n'est plus `private` (visible dans le
 paquet, pour le mode texte). Tests : `MesureCorpusTest` (2). Suite complète : 120 tests.
+
+## Finalisation (20/11/2026)
+
+- Figures : `courbes.py` trace 5 PNG depuis les CSV (`construction_index`, `distances_jaccard`, `requetes`,
+  `index_texte`, `heaps`).
+- Fiche Livre : une ligne sous « Livres proches », comme sous les suggestions de la vue Résultats.
+- `docs/api.md` réécrit : seulement l'API réelle (3 routes, exemples de réponses, erreurs) ; les ajouts
+  abandonnés et les explications de calcul n'y sont plus (elles vont dans le rapport).
+- README écrit : prérequis, téléchargement, index et graphe, build, serveur, démo, tests, mesures.
+- Vérification depuis une copie propre du dépôt (sans `data/`, `node_modules`, `target`), en suivant le
+  README dans PowerShell : `npm.cmd ci`, `npm.cmd run build`, `mvnw clean package` (120 tests verts,
+  1 min 18 s), serveur prêt en 4 s ; `whale` 282 livres, regex `wh(a` 400, fiche de Moby-Dick 10 voisins.
+  Dans PowerShell, `npm` échoue (scripts `.ps1` bloqués) : il faut `npm.cmd`.
+- `MesureCorpus` relancé dans cette copie : mêmes ordres de grandeur (index 20,3 s contre 18,7 s le 18/11).
+  Les CSV du 18/11 restent la référence du rapport.
