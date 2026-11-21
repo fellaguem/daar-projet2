@@ -1,2 +1,2 @@
-// Téléchargement et nettoyage des livres Gutenberg
+// telechargement et nettoyage des livres Gutenberg
 package corpus;
