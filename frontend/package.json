@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:mock": "vite --mode mock",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "node --test tests/"
   },
   "dependencies": {
     "react": "18.3.1",
