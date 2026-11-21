@@ -29,10 +29,12 @@ export default function ListeResultats({ resultats }) {
       <ol className="resultats">
         {resultats.slice(0, nbAffiches).map((r, i) => (
           <li key={r.id} className="resultat">
+            {/* rang dans sa propre colonne, pour l'afficher dans la marge gauche */}
+            <span className="rang">{i + 1}.</span>
             <div className="livre">
               {/* titre limité à 2 lignes (certains dépassent 250 caractères), complet en infobulle */}
               <div className="ligne-titre">
-                {i + 1}. <Link className="titre" to={'/livre/' + r.id} title={r.titre}>{r.titre}</Link>
+                <Link className="titre" to={'/livre/' + r.id} title={r.titre}>{r.titre}</Link>
               </div>
               {r.auteur && <div className="auteur">{r.auteur}</div>}
             </div>

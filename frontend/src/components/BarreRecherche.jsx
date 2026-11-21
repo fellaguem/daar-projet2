@@ -29,7 +29,8 @@ export default function BarreRecherche({ valeur = '', avance = false, autoFocus 
   return (
     <form onSubmit={envoyer} className="carte barre">
       <input
-        className="champ"
+        // en RegEx, le champ passe en police à chasse fixe (une regex est une chaîne littérale)
+        className={regex ? 'champ regex' : 'champ'}
         autoFocus={autoFocus}
         aria-label={regex ? 'Expression régulière' : 'Mot-clef'}
         value={texte}
