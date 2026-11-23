@@ -13,7 +13,6 @@ Depuis `frontend/` :
 | `npm run dev` | serveur de développement (port 5173) ; `/api` est envoyé au serveur Spring Boot sur 8080 |
 | `npm run dev:mock` | même chose sans serveur : réponses factices (`src/api/factices.js`) |
 | `npm run build` | build dans `backend/src/main/resources/static` ; reconstruire ensuite le jar (`.\mvnw.cmd package`) pour qu'il le contienne |
-| `npm test` | tests des fonctions de `src/outils/` (`node --test`, sans dépendance) |
 
 ## Organisation
 
@@ -39,7 +38,7 @@ src/
 ├── api/
 │   ├── client.js     appels HTTP ; une erreur porte le message du serveur et son statut (400, 404)
 │   └── factices.js   données du mode dev:mock
-└── outils/           fonctions sans React, partagées ou génériques, testées dans tests/
+└── outils/           fonctions sans React, partagées ou génériques
     │                 propres au projet, utilisées par plusieurs fichiers :
     ├── recherches.js exemples, tris, adresse d'une recherche, détection d'une regex
     ├── navigation.js état transmis à la fiche d'un livre (voir plus bas)
@@ -49,7 +48,6 @@ src/
     ├── texte.js      couper un texte trop long
     ├── stockage.js   lecture et écriture protégées du stockage du navigateur
     └── ecran.js      largeur « téléphone » (600px)
-tests/                tests node --test des fichiers .js (outils, place, extrait ; faux stockage dans fauxStockage.js)
 ```
 
 Où ranger quoi :
@@ -57,9 +55,8 @@ Où ranger quoi :
 - une page = un fichier, dans le même ordre : imports, constantes, `// ---------- la page ----------`
   (le composant exporté), puis `// ---------- morceaux de la page ----------` (ses petits composants) ;
 - la logique sans React d'une seule page va dans un fichier `.js` à côté, dans le dossier de la page
-  (`pages/resultats/place.js`), avec un test dans `tests/` ;
-- une fonction sans React utilisée par plusieurs fichiers, ou générique, va dans `outils/`,
-  avec un test dans `tests/` ;
+  (`pages/resultats/place.js`) ;
+- une fonction sans React utilisée par plusieurs fichiers, ou générique, va dans `outils/` ;
 - un appel au serveur va dans `api/client.js`, avec sa réponse factice dans `api/factices.js` ;
 - un morceau d'interface utilisé par plusieurs pages va dans `components/`.
 

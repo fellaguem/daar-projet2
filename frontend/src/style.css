@@ -1,19 +1,15 @@
-/* Style « salle de lecture », avec deux voix typographiques :
-   - la voix du livre (serif) pour ce qui vient des livres : titres, auteurs, extrait ;
-   - la voix de l'outil (de type DIN) pour ce qui vient du moteur : barre, boutons, chiffres.
-   Polices système seulement : la démo doit marcher sur un réseau local sans Internet.
-   Disposition reprise de la maquette de la vue Résultats (docs/maquette). */
+
 :root {
-  --encre: #1c2420;        /* texte */
+  --encre: #1c2420;        
   --papier: #f3f5f2;       /* fond de la page */
   --page: #ffffff;         /* surfaces : barre, liste, fiche */
   --vert: #1f5e46;         /* vert des lampes de salle de lecture : bouton, focus, survol */
   --vert-fonce: #174a37;   /* bouton survolé */
-  --vert-pale: #e4ece7;    /* fond des suggestions */
+  --vert-pale: #e4ece7;   
   --mine: #5b6660;         /* texte secondaire : auteur, sous-titres */
   --indice: #68726d;       /* placeholder du champ : 4,98:1 sur le blanc du champ (texte saisi : 15,9:1) */
   --filet: #cdd5d0;        /* bordures */
-  --filet-clair: #e3e8e5;  /* séparateurs de la liste, message « aucun résultat » */
+  --filet-clair: #e3e8e5;  
   --rouge: #a4262c;        /* erreurs seulement */
 
   /* Sitka (Windows) ; Charter et Iowan (Mac, iPhone) ; Palatino et Georgia en secours */
@@ -41,9 +37,6 @@ button, input, select { font: inherit; }
 .logo { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--filet); border-radius: 8px; background: var(--page); color: var(--vert); }
 main { padding-top: 20px; padding-bottom: 56px; }
 
-/* accueil : titre et grande barre au centre de l'écran, puis exemples et dernières recherches.
-   Le bloc prend la hauteur de l'écran moins l'en-tête (76px) et les marges de main (76px) ;
-   svh : la barre d'adresse des téléphones ne décale rien. Le padding du bas le remonte un peu. */
 .accueil { min-height: calc(100vh - 152px); min-height: calc(100svh - 152px); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; padding-bottom: 6vh; }
 .accueil h1 { font-family: var(--livre-titre); font-size: 36px; font-weight: 600; line-height: 1.15; margin: 0 0 24px; text-align: center; }
 .accueil .barre, .raccourcis { width: 100%; max-width: 720px; box-sizing: border-box; }
@@ -51,13 +44,10 @@ main { padding-top: 20px; padding-bottom: 56px; }
 .raccourcis .pastilles { justify-content: center; }
 .recentes { display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--mine); }
 .pastille.regex { font-family: var(--code); }
-/* croix qui vide les dernières recherches */
 .effacer { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: none; border-radius: 50%; background: none; color: var(--mine); cursor: pointer; }
 .effacer:hover { background: var(--filet-clair); color: var(--encre); }
-/* mode d'une dernière recherche en RegEx */
 .etiquette { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--vert-pale); color: var(--vert); font-family: var(--outil); font-size: 13px; }
 
-/* surfaces blanches : barre, liste, fiche (les suggestions sont une bande, pas une carte) */
 .carte { background: var(--page); border: 1px solid var(--filet); border-radius: 6px; }
 
 /* barre de recherche (Accueil et Résultats) : la surface la plus forte de la page */

@@ -9,15 +9,14 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import recherche.LivreIntrouvable;
 import recherche.RequeteInvalide;
 
-// Transforme les erreurs en réponses JSON { "erreur": "..." } avec le bon code HTTP
+// renvoie les erreurs en JSON, avec le bon statut
 @RestControllerAdvice
 public class GestionErreurs {
 
-    // mot-clef vide, regex invalide, tri ou mode inconnu
     @ExceptionHandler(RequeteInvalide.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Dto.Erreur requeteInvalide(RequeteInvalide e) {
-        return new Dto.Erreur(e.getMessage());
+        return new Dto.Erreur(e.getMessage()); // requête pas valide
     }
 
     @ExceptionHandler(LivreIntrouvable.class)
@@ -26,17 +25,16 @@ public class GestionErreurs {
         return new Dto.Erreur(e.getMessage());
     }
 
-    // ?q= ou ?regex= absent
+    // paramètre oublié dans l'URL
     @ExceptionHandler(MissingServletRequestParameterException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Dto.Erreur parametreManquant(MissingServletRequestParameterException e) {
-        return new Dto.Erreur("Paramètre manquant : " + e.getParameterName());
+    public Dto.Erreur parametreManquant(MissingServletRequestParameterException ex) {
+        return new Dto.Erreur("Paramètre manquant : " + ex.getParameterName());
     }
 
-    // /api/books/abc
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public Dto.Erreur parametreInvalide(MethodArgumentTypeMismatchException e) {
-        return new Dto.Erreur("Paramètre invalide : " + e.getName());
+    public Dto.Erreur parametreInvalide(MethodArgumentTypeMismatchException err) {
+        return new Dto.Erreur("Paramètre invalide : " + err.getName()); // ex : id non numérique
     }
 }

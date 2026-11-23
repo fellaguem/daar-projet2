@@ -7,10 +7,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 // Recherche par mot-clef dans l'index.
-//
-// La requête est lue avec la même règle que les livres (Index.motsDeRequete).
-// Avec plusieurs mots, on garde les livres qui les contiennent TOUS (ET) ;
-// le score d'un livre est la somme des occurrences de ces mots dans le livre.
 public final class RechercheIndex {
 
     private final Index index;

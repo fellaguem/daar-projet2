@@ -44,8 +44,8 @@ cd ..
 Ces commandes fabriquent l'application :
 
 - `npm run build` prépare le site (le front) ;
-- `mvnw clean package` lance les 120 tests, puis crée le fichier
-- `backend/target/moteur-recherche-0.1.0.jar`, qui contient tout : le serveur et le site.
+- `mvnw clean package` compile le serveur, lance les tests et crée le fichier
+  `backend/target/moteur-recherche-0.1.0.jar`, qui contient tout : le serveur et le site.
 
 L'ordre compte : il faut préparer le site avant le jar, sinon le jar ne le contient pas.
 
@@ -95,10 +95,10 @@ Depuis une autre machine du même réseau, ouvrir `http://IP-du-serveur:8080` (a
 
 ```
 cd backend; .\mvnw.cmd test; cd ..
-
 ```
 
-120 tests JUnit, dont ceux du projet 1 (`backend/src/test/java/projet1`). Ils n'ont pas besoin du corpus.
+Quelques tests JUnit sur les parties principales : index, recherche par mot-clef et par regex,
+distance de Jaccard et PageRank. Pas besoin du corpus pour les lancer.
 
 ## 7. Mesures et courbes
 

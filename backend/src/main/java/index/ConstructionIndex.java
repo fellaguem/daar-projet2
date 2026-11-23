@@ -7,13 +7,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 
-// Construit l'index depuis les livres téléchargés (programme lancé une fois, hors ligne du serveur).
-//
-//   java -cp backend/target/classes index.ConstructionIndex [--livres data/livres] [--sortie data/index.bin]
-//                                                           [--chercher mot]
-//
-// Les livres sont les fichiers ID.txt du dossier. L'option --chercher affiche les 10 livres
-// qui contiennent le mot le plus souvent (pour vérifier à la main).
+// Construit l'index des livres, une seule fois avant de lancer le serveur.
 public class ConstructionIndex {
 
     public static void main(String[] args) throws IOException {
@@ -33,67 +27,69 @@ public class ConstructionIndex {
             }
         }
 
-        long debut = System.nanoTime();
-        Index index = depuisDossier(livres);
-        long msConstruction = (System.nanoTime() - debut) / 1_000_000;
+        long t0 = System.nanoTime();
+        Index ix = depuisDossier(livres);
+        long tBuild = (System.nanoTime() - t0) / 1_000_000;
 
-        index.sauver(sortie);
-        long ms = (System.nanoTime() - debut) / 1_000_000;
+        ix.sauver(sortie);
+        long tAll = (System.nanoTime() - t0) / 1_000_000;
 
-        System.out.println("Livres : " + index.nbLivres());
-        System.out.println("Mots différents : " + index.nbMots());
-        System.out.println("Postings (couples mot-livre) : " + index.nbPostings());
-        System.out.println("Construction : " + msConstruction + " ms, avec sauvegarde : " + ms + " ms");
+        System.out.println("Livres : " + ix.nbLivres());
+        System.out.println("Mots différents : " + ix.nbMots());
+        System.out.println("Postings (couples mot-livre) : " + ix.nbPostings());
+        System.out.println("Construction : " + tBuild + " ms, avec sauvegarde : " + tAll + " ms");
         System.out.println("Fichier " + sortie + " : " + Files.size(sortie) / 1024 / 1024 + " Mo");
 
         if (chercher != null) {
-            afficher(index, Tokeniseur.mots(chercher));
+            afficher(ix, Tokeniseur.mots(chercher));
         }
     }
 
-    // lit tous les fichiers ID.txt du dossier, par identifiant croissant
+    // On garde les livres dans l'ordre de leur ID.
     public static Index depuisDossier(Path dossier) throws IOException {
-        List<Path> fichiers;
-        try (Stream<Path> stream = Files.list(dossier)) {
-            fichiers = stream.filter(p -> p.getFileName().toString().matches("\\d+\\.txt"))
-                .sorted((a, b) -> Integer.compare(id(a), id(b)))
-                .toList();
+        List<Path> docs;
+        try (Stream<Path> flux = Files.list(dossier)) {
+            docs = flux.filter(p -> p.getFileName().toString().matches("\\d+\\.txt"))
+                    .sorted((a, b) -> Integer.compare(id(a), id(b)))
+                    .toList();
         }
 
-        Index.Constructeur constructeur = new Index.Constructeur();
-        for (Path fichier : fichiers) {
-            constructeur.ajouterLivre(id(fichier), Files.readString(fichier, StandardCharsets.UTF_8));
+        Index.Constructeur c = new Index.Constructeur();
+        for (Path f : docs) {
+            c.ajouterLivre(id(f), Files.readString(f, StandardCharsets.UTF_8));
         }
-        return constructeur.construire();
+        return c.construire();
     }
 
-    private static int id(Path fichier) {
-        String nom = fichier.getFileName().toString();
-        return Integer.parseInt(nom.substring(0, nom.length() - ".txt".length()));
+    private static int id(Path f) {
+        String n = f.getFileName().toString();
+        return Integer.parseInt(n.substring(0, n.length() - ".txt".length()));
     }
 
-    private static void afficher(Index index, List<String> mots) {
-        if (mots.isEmpty()) {
+    // controle de la ou les livres où le mot revient le plus.
+    private static void afficher(Index ix, List<String> mots) {
+        if (mots.isEmpty())
             return;
-        }
+
         String mot = mots.get(0);
-        int m = index.trouver(mot);
+        int m = ix.trouver(mot);
         if (m < 0) {
             System.out.println("« " + mot + " » : absent de l'index");
             return;
         }
-        System.out.println("« " + mot + " » : " + (index.fin(m) - index.debut(m)) + " livres");
+        System.out.println("« " + mot + " » : " + (ix.fin(m) - ix.debut(m)) + " livres");
 
-        Integer[] postings = new Integer[index.fin(m) - index.debut(m)];
-        for (int i = 0; i < postings.length; i++) {
-            postings[i] = index.debut(m) + i;
+        Integer[] pos = new Integer[ix.fin(m) - ix.debut(m)];
+        for (int j = 0; j < pos.length; j++) {
+            pos[j] = ix.debut(m) + j;
         }
-        java.util.Arrays.sort(postings,
-            (a, b) -> Integer.compare(index.occurrencesDuPosting(b), index.occurrencesDuPosting(a)));
-        for (int i = 0; i < Math.min(10, postings.length); i++) {
-            int p = postings[i];
-            System.out.println("  livre " + index.idLivre(index.livreDuPosting(p))
-                + " : " + index.occurrencesDuPosting(p) + " occurrences");
+        java.util.Arrays.sort(pos,
+                (a, b) -> Integer.compare(ix.occurrencesDuPosting(b), ix.occurrencesDuPosting(a)));
+
+        for (int j = 0; j < Math.min(10, pos.length); j++) {
+            int p = pos[j]; // posting du livre
+            System.out.println("  livre " + ix.idLivre(ix.livreDuPosting(p))
+                    + " : " + ix.occurrencesDuPosting(p) + " occurrences");
         }
     }
 }

@@ -1,7 +1,4 @@
 // Lecture et écriture de JSON dans le stockage du navigateur.
-// type : 'local' (localStorage, gardé entre les visites) ou 'session' (sessionStorage, le temps de l'onglet).
-// Le stockage peut être absent ou refuser l'accès (navigation privée, stockage bloqué) :
-// chaque accès est protégé, et sans stockage on lit la valeur par défaut et on n'écrit rien.
 
 function stockage(type) {
   return type === 'session' ? window.sessionStorage : window.localStorage

@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import recherche.Moteur;
 
-// Page d'un livre : métadonnées, extrait, voisins dans le graphe de Jaccard
+// Page d'un livre (métadonnées, extrait..)
 @RestController
 @RequestMapping("/api/books")
 public class LivreController {

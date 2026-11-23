@@ -13,11 +13,7 @@ import org.springframework.boot.web.context.WebServerApplicationContext;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-// Démarrage "à chaud", côté HTTP : dès que le serveur écoute, il s'envoie quelques requêtes.
-// Moteur.chauffer() chauffe la recherche elle-même ; ici on chauffe le reste (Spring MVC, écriture
-// du JSON). Sans cela, la première requête de la démo prenait environ 640 ms, les suivantes 70 à 115 ms.
-// Si le serveur n'écoute pas sur 127.0.0.1 (server.address réglé sur une autre adresse), on ne
-// fait rien de plus qu'un message dans le journal.
+// Démarrage "à chaud", côté HTTP : dès que le serveur écoute, il s'envoie quelques requêtes
 @Component
 public class ChauffeHttp {
 

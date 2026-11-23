@@ -4,13 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-// L'unique classe qui découpe un texte en mots.
-// Elle sert à compter les mots du corpus, à construire l'index et à lire les requêtes :
-// il faut la même règle partout, sinon un mot de l'index ne serait pas retrouvé.
-//
-// Règle : un mot est une suite de lettres (accents compris), mise en minuscules.
-// Tout le reste (chiffres, ponctuation, apostrophes, tirets, espaces) sépare les mots :
-// "don't" donne "don" et "t", "well-known" donne "well" et "known".
+// L'unique classe qui découpe un texte en mots
+// elle sert à compter les mots du corpus, à construire l'index et à lire les requêtes
+// il faut la même règle partout, sinon un mot de l'index ne serait pas retrouvé
 public final class Tokeniseur {
 
     private Tokeniseur() {}

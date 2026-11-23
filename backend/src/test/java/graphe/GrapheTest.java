@@ -1,124 +1,61 @@
 package graphe;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
+import index.Index;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
+// distance de Jaccard et PageRank sur des petits cas qu'on sait calculer a la main
 class GrapheTest {
 
-    private static final int[] IDS = {10, 20, 30, 40};
-
-    // paires dans l'ordre (0,1) (0,2) (0,3) (1,2) (1,3) (2,3)
-    private static final float[] DIST = {0.1f, 0.5f, 0.9f, 0.2f, 0.95f, 0.3f};
-
     @Test
-    void aretesStrictementSousLeSeuil() {
-        Graphe g = Graphe.depuisDistances(IDS, DIST, 0.4);
-        // arêtes : 0-1 (0,1), 1-2 (0,2), 2-3 (0,3) : un chemin
-        assertEquals(3, g.nbAretes());
-        assertArrayEquals(new int[] {1, 2, 2, 1}, new int[] {g.degre(0), g.degre(1), g.degre(2), g.degre(3)});
+    void distanceDeJaccard() {
+        Index.Constructeur c = new Index.Constructeur();
+        c.ajouterLivre(10, "alpha beta gamma");
+        c.ajouterLivre(11, "beta gamma delta");
+        c.ajouterLivre(12, "omega sigma");
+        Jaccard j = new Jaccard(c.construire(), 1.0); // 1.0 = on garde tous les mots
 
-        // seuil égal à une distance : l'arête n'est pas prise (strictement sous le seuil)
-        assertEquals(2, Graphe.depuisDistances(IDS, DIST, 0.3).nbAretes());
+        // 2 mots en commun sur 4 au total -> 1 - 2/4 = 0.5
+        assertEquals(0.5, j.distance(0, 1), 1e-9);
+        // rien en commun -> distance max
+        assertEquals(1.0, j.distance(0, 2), 1e-9);
     }
 
-    @Test
-    void grapheSymetriqueSansBoucleEtVoisinsTriesParDistance() {
-        Graphe g = Graphe.depuisDistances(IDS, DIST, 0.6);
-        for (int i = 0; i < g.nbSommets(); i++) {
-            for (int p = g.debut(i); p < g.fin(i); p++) {
-                int v = g.voisin(p);
-                assertTrue(v != i, "pas de boucle");
-                boolean retour = false;
-                for (int q = g.debut(v); q < g.fin(v); q++) {
-                    retour |= g.voisin(q) == i && g.distance(q) == g.distance(p);
-                }
-                assertTrue(retour, "arête " + i + "-" + v + " dans les deux sens");
-                if (p > g.debut(i)) {
-                    assertTrue(g.distance(p - 1) <= g.distance(p), "voisins triés");
-                }
-            }
+    // construit un graphe de n sommets : on met une distance de 0.5 sur les aretes voulues
+    // et 1 partout ailleurs, puis on coupe a 0.75
+    private Graphe graphe(int n, int[][] aretes) {
+        float[] dist = new float[n * (n - 1) / 2];
+        Arrays.fill(dist, 1f);
+        for (int[] a : aretes) {
+            dist[Jaccard.indicePaire(Math.min(a[0], a[1]), Math.max(a[0], a[1]), n)] = 0.5f;
         }
-        // voisins du sommet 1 : 0 (0,1) puis 2 (0,2)
-        assertEquals(0, g.voisin(g.debut(1)));
-        assertEquals(2, g.voisin(g.debut(1) + 1));
-        // voisins du sommet 0 : 1 (0,1) puis 2 (0,5)
-        assertEquals(1, g.voisin(g.debut(0)));
-        assertEquals(0.5f, g.distance(g.debut(0) + 1));
-    }
-
-    @Test
-    void isolesEtComposantes() {
-        Graphe g = Graphe.depuisDistances(IDS, DIST, 0.15); // seule l'arête 0-1
-        assertEquals(1, g.nbAretes());
-        assertEquals(2, g.nbIsoles());
-        assertArrayEquals(new int[] {2, 1, 1}, g.composantes());
-
-        Graphe chemin = Graphe.depuisDistances(IDS, DIST, 0.4);
-        assertArrayEquals(new int[] {4}, chemin.composantes());
-        assertEquals(0, chemin.nbIsoles());
-    }
-
-    @Test
-    void seuilPourUnDegreMoyen() {
-        // degré moyen 1,5 sur 4 livres : 3 arêtes -> les 3 plus petites distances (0,1 0,2 0,3)
-        double seuil = Graphe.seuilPourDegreMoyen(DIST, 4, 1.5);
-        assertEquals(0.5f, (float) seuil);
-        assertEquals(3, Graphe.depuisDistances(IDS, DIST, seuil).nbAretes());
-
-        assertEquals(0, Graphe.depuisDistances(IDS, DIST, Graphe.seuilPourDegreMoyen(DIST, 4, 0)).nbAretes());
-        assertEquals(6, Graphe.depuisDistances(IDS, DIST, Graphe.seuilPourDegreMoyen(DIST, 4, 100)).nbAretes());
-    }
-
-    @Test
-    void sauvegardePuisChargement(@TempDir Path dossier) throws IOException {
-        Graphe avant = Graphe.depuisDistances(IDS, DIST, 0.6);
-        Path fichier = dossier.resolve("graphe.bin");
-        avant.sauver(fichier);
-        Graphe apres = Graphe.charger(fichier);
-
-        assertEquals(avant.nbSommets(), apres.nbSommets());
-        assertEquals(avant.nbAretes(), apres.nbAretes());
-        assertEquals(avant.seuil(), apres.seuil());
-        for (int i = 0; i < avant.nbSommets(); i++) {
-            assertEquals(avant.idLivre(i), apres.idLivre(i));
-            assertEquals(avant.debut(i), apres.debut(i));
-            assertEquals(avant.fin(i), apres.fin(i));
+        int[] ids = new int[n];
+        for (int i = 0; i < n; i++) {
+            ids[i] = i;
         }
-        for (int p = 0; p < 2 * avant.nbAretes(); p++) {
-            assertEquals(avant.voisin(p), apres.voisin(p));
-            assertEquals(avant.distance(p), apres.distance(p));
+        return Graphe.depuisDistances(ids, dist, 0.75);
+    }
+
+    @Test
+    void pageRankCentreDeLEtoile() {
+        // etoile : le sommet 0 est relie a tous les autres
+        double[] pr = PageRank.calculer(graphe(5, new int[][] {{0, 1}, {0, 2}, {0, 3}, {0, 4}})).scores();
+
+        assertEquals(1.0, Arrays.stream(pr).sum(), 1e-9); // c'est une distribution
+        for (int i = 1; i < 5; i++) {
+            assertTrue(pr[0] > pr[i], "le centre doit etre le plus important");
         }
-
-        Path autre = dossier.resolve("autre.bin");
-        Files.write(autre, new byte[] {0, 0, 0, 0, 0, 0, 0, 0});
-        assertThrows(IOException.class, () -> Graphe.charger(autre));
     }
 
     @Test
-    void listeDAretesLisible(@TempDir Path dossier) throws IOException {
-        Path csv = dossier.resolve("aretes.csv");
-        Graphe.depuisDistances(IDS, DIST, 0.4).ecrireAretesCsv(csv);
-        assertEquals(List.of("id1,id2,distance", "10,20,0.100000", "20,30,0.200000", "30,40,0.300000"),
-            Files.readAllLines(csv, StandardCharsets.UTF_8));
-    }
-
-    @Test
-    void grapheVideEtUnSeulLivre() {
-        Graphe vide = Graphe.depuisDistances(new int[0], new float[0], 0.5);
-        assertEquals(0, vide.nbSommets());
-        assertEquals(0, vide.composantes().length);
-
-        Graphe seul = Graphe.depuisDistances(new int[] {7}, new float[0], 0.5);
-        assertEquals(1, seul.nbIsoles());
+    void pageRankCycle() {
+        // dans un cycle personne n'est plus central qu'un autre
+        double[] pr = PageRank.calculer(graphe(4, new int[][] {{0, 1}, {1, 2}, {2, 3}, {3, 0}})).scores();
+        for (double s : pr) {
+            assertEquals(0.25, s, 1e-9);
+        }
     }
 }

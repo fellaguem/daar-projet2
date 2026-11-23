@@ -13,16 +13,11 @@ import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Locale;
 
-// Graphe de Jaccard : un sommet par livre, une arête entre deux livres si leur distance est
-// strictement sous le seuil. Graphe non orienté : chaque arête est rangée dans les deux sens.
-//
-// Rangement en tableaux (comme l'index) :
-//   voisins[debut[i]] .. voisins[debut[i+1]-1]   les voisins du livre i, du plus proche au plus loin
-//   distances[p]                                  la distance de l'arête p
-// Les sommets sont les numéros de livres de l'index ; idLivre(i) donne l'identifiant Gutenberg.
+// Un sommet = un livre. On relie les deux quand la distance passe sous le seuil.
+// Les arêtes vont dans les deux sens, et les voisins sont triés par distance.
 public final class Graphe {
 
-    private static final int MAGIE = 0x47524631; // "GRF1"
+    private static final int MAGIE = 0x47524631; // GRF1
 
     private final int[] idsLivres;
     private final int[] debut;
@@ -38,74 +33,69 @@ public final class Graphe {
         this.seuil = seuil;
     }
 
-    // dist : distances rangées comme Jaccard.toutesLesDistances (paires i < j, ligne par ligne)
+    // dist suit l'ordre des paires i < j de Jaccard
     public static Graphe depuisDistances(int[] idsLivres, float[] dist, double seuil) {
         int n = idsLivres.length;
 
-        // 1. degré de chaque sommet
-        int[] degre = new int[n];
+        int[] deg = new int[n]; // compter les voisins d'abord
         int k = 0;
         for (int i = 0; i < n; i++) {
             for (int j = i + 1; j < n; j++) {
                 if (dist[k++] < seuil) {
-                    degre[i]++;
-                    degre[j]++;
+                    deg[i]++;
+                    deg[j]++;
                 }
             }
         }
-        int[] debut = new int[n + 1];
-        for (int i = 0; i < n; i++) {
-            debut[i + 1] = debut[i] + degre[i];
-        }
 
-        // 2. on range chaque arête dans les deux sens, sous forme d'une clé (distance, voisin) :
-        // une distance positive garde le même ordre que ses bits, donc trier les clés trie par distance
-        long[] cles = new long[debut[n]];
-        int[] place = Arrays.copyOf(debut, n);
+        int[] deb = new int[n + 1];
+        for (int i = 0; i < n; i++)
+            deb[i + 1] = deb[i] + deg[i];
+
+        // chaque lien est ajouté 2 fois
+        long[] keys = new long[deb[n]];
+        int[] pos = Arrays.copyOf(deb, n);
         k = 0;
+
         for (int i = 0; i < n; i++) {
             for (int j = i + 1; j < n; j++) {
                 float d = dist[k++];
                 if (d < seuil) {
-                    cles[place[i]++] = cle(d, j);
-                    cles[place[j]++] = cle(d, i);
+                    keys[pos[i]++] = cle(d, j);
+                    keys[pos[j]++] = cle(d, i);
                 }
             }
         }
 
-        // 3. voisins de chaque sommet du plus proche au plus loin
-        int[] voisins = new int[cles.length];
-        float[] distances = new float[cles.length];
+        int[] vois = new int[keys.length];
+        float[] dd = new float[keys.length];
+
         for (int i = 0; i < n; i++) {
-            Arrays.sort(cles, debut[i], debut[i + 1]);
-            for (int p = debut[i]; p < debut[i + 1]; p++) {
-                voisins[p] = (int) cles[p];
-                distances[p] = Float.intBitsToFloat((int) (cles[p] >>> 32));
+            Arrays.sort(keys, deb[i], deb[i + 1]);
+            for (int p = deb[i]; p < deb[i + 1]; p++) {
+                vois[p] = (int) keys[p];
+                dd[p] = Float.intBitsToFloat((int) (keys[p] >>> 32));
             }
         }
-        return new Graphe(idsLivres.clone(), debut, voisins, distances, seuil);
+        return new Graphe(idsLivres.clone(), deb, vois, dd, seuil);
     }
 
     private static long cle(float distance, int voisin) {
         return ((long) Float.floatToIntBits(distance) << 32) | voisin;
     }
 
-    // Seuil qui donne environ degreMoyen voisins par livre : on garde les m = degreMoyen * n / 2
-    // plus petites distances (moins si plusieurs paires ont exactement la même distance).
+    // on prend les m plus petites distances
     public static double seuilPourDegreMoyen(float[] dist, int n, double degreMoyen) {
         long m = Math.round(degreMoyen * n / 2.0);
-        if (m <= 0) {
-            return 0.0; // aucune arête
-        }
-        if (m >= dist.length) {
-            return 2.0; // toutes les arêtes (une distance vaut au plus 1)
-        }
+        if (m <= 0)
+            return 0.0;
+        if (m >= dist.length)
+            return 2.0; // toutes les arêtes
+
         float[] tri = dist.clone();
         Arrays.sort(tri);
         return tri[(int) m];
     }
-
-    // ---------- accès ----------
 
     public int nbSommets() {
         return idsLivres.length;
@@ -123,7 +113,6 @@ public final class Graphe {
         return seuil;
     }
 
-    // nombre d'arêtes (chaque arête comptée une fois)
     public int nbAretes() {
         return voisins.length / 2;
     }
@@ -149,54 +138,53 @@ public final class Graphe {
     }
 
     public int nbIsoles() {
-        int n = 0;
+        int nb = 0;
         for (int i = 0; i < nbSommets(); i++) {
-            if (degre(i) == 0) {
-                n++;
-            }
+            if (degre(i) == 0)
+                nb++;
         }
-        return n;
+        return nb;
     }
 
-    // taille de chaque composante connexe (parcours en largeur), de la plus grande à la plus petite
+    // composantes connexes, avec une file
     public int[] composantes() {
         int n = nbSommets();
-        boolean[] vu = new boolean[n];
+        boolean[] seen = new boolean[n];
         int[] tailles = new int[n];
         int nb = 0;
-        ArrayDeque<Integer> file = new ArrayDeque<>();
+
+        ArrayDeque<Integer> q = new ArrayDeque<>();
         for (int s = 0; s < n; s++) {
-            if (vu[s]) {
+            if (seen[s])
                 continue;
-            }
-            int taille = 0;
-            vu[s] = true;
-            file.add(s);
-            while (!file.isEmpty()) {
-                int u = file.poll();
-                taille++;
+
+            int t = 0;
+            seen[s] = true;
+            q.add(s);
+            while (!q.isEmpty()) {
+                int u = q.poll();
+                t++;
                 for (int p = debut[u]; p < debut[u + 1]; p++) {
-                    if (!vu[voisins[p]]) {
-                        vu[voisins[p]] = true;
-                        file.add(voisins[p]);
+                    if (!seen[voisins[p]]) {
+                        seen[voisins[p]] = true;
+                        q.add(voisins[p]);
                     }
                 }
             }
-            tailles[nb++] = taille;
+            tailles[nb++] = t;
         }
-        int[] resultat = Arrays.copyOf(tailles, nb);
-        Arrays.sort(resultat);
+
+        int[] res = Arrays.copyOf(tailles, nb);
+        Arrays.sort(res);
         for (int i = 0; i < nb / 2; i++) {
-            int t = resultat[i];
-            resultat[i] = resultat[nb - 1 - i];
-            resultat[nb - 1 - i] = t;
+            int tmp = res[i];
+            res[i] = res[nb - 1 - i];
+            res[nb - 1 - i] = tmp;
         }
-        return resultat;
+        return res;
     }
 
-    // ---------- fichiers ----------
-
-    // liste d'arêtes lisible (une ligne par arête, identifiants Gutenberg), pour le rapport
+    // une ligne CSV par arête, sans doublon
     public void ecrireAretesCsv(Path fichier) throws IOException {
         try (PrintStream out = new PrintStream(Files.newOutputStream(fichier), false, StandardCharsets.UTF_8)) {
             out.println("id1,id2,distance");
@@ -217,12 +205,12 @@ public final class Graphe {
             out.writeInt(idsLivres.length);
             out.writeInt(voisins.length);
             out.writeDouble(seuil);
-            for (int id : idsLivres) {
+
+            for (int id : idsLivres)
                 out.writeInt(id);
-            }
-            for (int d : debut) {
+            for (int d : debut)
                 out.writeInt(d);
-            }
+
             for (int i = 0; i < voisins.length; i++) {
                 out.writeInt(voisins[i]);
                 out.writeFloat(distances[i]);
@@ -236,24 +224,26 @@ public final class Graphe {
             if (in.readInt() != MAGIE) {
                 throw new IOException("Ce fichier n'est pas un graphe : " + fichier);
             }
+
             int n = in.readInt();
-            int nbEntrees = in.readInt();
-            double seuil = in.readDouble();
+            int nEnt = in.readInt();
+            double s = in.readDouble();
+
             int[] ids = new int[n];
-            for (int i = 0; i < n; i++) {
+            for (int i = 0; i < n; i++)
                 ids[i] = in.readInt();
+
+            int[] deb = new int[n + 1];
+            for (int i = 0; i <= n; i++)
+                deb[i] = in.readInt();
+
+            int[] vois = new int[nEnt];
+            float[] dd = new float[nEnt];
+            for (int i = 0; i < nEnt; i++) {
+                vois[i] = in.readInt();
+                dd[i] = in.readFloat();
             }
-            int[] debut = new int[n + 1];
-            for (int i = 0; i <= n; i++) {
-                debut[i] = in.readInt();
-            }
-            int[] voisins = new int[nbEntrees];
-            float[] distances = new float[nbEntrees];
-            for (int i = 0; i < nbEntrees; i++) {
-                voisins[i] = in.readInt();
-                distances[i] = in.readFloat();
-            }
-            return new Graphe(ids, debut, voisins, distances, seuil);
+            return new Graphe(ids, deb, vois, dd, s);
         }
     }
 }

@@ -11,11 +11,6 @@ import org.springframework.context.annotation.Configuration;
 import recherche.Moteur;
 
 // Crée le moteur une seule fois, au démarrage du serveur.
-// Dossier des données : propriété moteur.dossier (application.properties, "data" par défaut),
-// à changer au lancement avec --moteur.dossier=data/test20 par exemple.
-// Si le serveur est lancé depuis backend/ (mvnw spring-boot:run), on cherche aussi dans ../
-// Un fichier manquant arrête le démarrage avec un message clair.
-// Le moteur est "chauffé" (Moteur.chauffer) avant que le serveur accepte des requêtes.
 @Configuration
 public class ConfigurationMoteur {
 

@@ -9,105 +9,103 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-// L'AFD minimal du projet 1, recopié dans un tableau (état, caractère) -> état suivant, pour tester
-// vite des centaines de milliers de mots.
-//
-// Même résultat que experimentation.MatcherUnePasse (vérifié par MatcherTableTest). Mais pour chaque
-// caractère, MatcherUnePasse crée une chaîne, cherche dans un TreeSet, puis dans deux HashMap et un
-// HashSet : environ 150 ms pour les 416 000 mots de l'index. Ici, une case de tableau par caractère.
-// La copie est faite une fois par requête (quelques états, quelques symboles : négligeable).
+// On met l'AFD dans des tableaux, c'est plus rapide pour tester les mots.
+// Pas besoin de parcourir les maps à chaque caractère.
 public final class MatcherTable implements Matcher {
 
-    private static final int MORT = -1; // pas de transition : le mot est rejeté
+    private static final int MORT = -1; // aucune transition
 
-    private final int[] colonne;     // colonne de chaque caractère ; AUTRE pour ceux hors de l'alphabet
-    private final int nbColonnes;
-    private final int[] suivant;     // suivant[etat * nbColonnes + colonne], MORT s'il n'y a pas de transition
-    private final boolean[] finaux;  // l'état initial a le numéro 0
+    private final int[] col;
+    private final int nc;
+    private final int[] tab;
+    private final boolean[] fin;
 
     public MatcherTable(Afd afd) {
-        // une colonne par symbole d'un caractère de l'alphabet, la dernière pour AUTRE
-        List<Character> symboles = new ArrayList<>();
+        List<Character> abc = new ArrayList<>();
+
         for (String s : afd.getAlphabet()) {
-            if (s.length() == 1) {
-                symboles.add(s.charAt(0));
-            }
-        }
-        int autre = symboles.size();
-        nbColonnes = autre + 1;
-        colonne = new int[Character.MAX_VALUE + 1];
-        Arrays.fill(colonne, autre);
-        for (int k = 0; k < symboles.size(); k++) {
-            colonne[symboles.get(k)] = k;
+            if (s.length() == 1)
+                abc.add(s.charAt(0));
         }
 
-        // numéros des états : parcours en largeur depuis l'état initial (numéro 0)
-        Map<Etat, Integer> numero = new HashMap<>();
-        List<Etat> etats = new ArrayList<>();
-        List<int[]> lignes = new ArrayList<>();
-        numero.put(afd.getInitial(), 0);
-        etats.add(afd.getInitial());
-        for (int i = 0; i < etats.size(); i++) {
-            int[] ligne = new int[nbColonnes];
-            for (int k = 0; k < nbColonnes; k++) {
-                String symbole = k == autre ? Afd.AUTRE : String.valueOf(symboles.get(k));
-                Etat destination = afd.transition(etats.get(i), symbole);
-                if (destination == null) {
-                    ligne[k] = MORT;
+        int hors = abc.size(); // tout ce qui n'est pas dans l'alphabet
+        nc = hors + 1;
+
+        col = new int[Character.MAX_VALUE + 1];
+        Arrays.fill(col, hors);
+        for (int k = 0; k < abc.size(); k++) {
+            col[abc.get(k)] = k;
+        }
+
+        // On numérote les états en partant du premier
+        Map<Etat, Integer> nums = new HashMap<>();
+        List<Etat> pile = new ArrayList<>();
+        List<int[]> rangs = new ArrayList<>();
+
+        nums.put(afd.getInitial(), 0);
+        pile.add(afd.getInitial());
+
+        for (int i = 0; i < pile.size(); i++) {
+            int[] rang = new int[nc];
+
+            for (int k = 0; k < nc; k++) {
+                String sym = (k == hors) ? Afd.AUTRE : String.valueOf(abc.get(k));
+                Etat dest = afd.transition(pile.get(i), sym);
+
+                if (dest == null) {
+                    rang[k] = MORT;
                 } else {
-                    Integer n = numero.get(destination);
-                    if (n == null) {
-                        n = etats.size();
-                        numero.put(destination, n);
-                        etats.add(destination);
+                    Integer no = nums.get(dest);
+                    if (no == null) {
+                        no = pile.size();
+                        nums.put(dest, no);
+                        pile.add(dest);
                     }
-                    ligne[k] = n;
+                    rang[k] = no;
                 }
             }
-            lignes.add(ligne);
+            rangs.add(rang);
         }
 
-        suivant = new int[etats.size() * nbColonnes];
-        finaux = new boolean[etats.size()];
-        for (int i = 0; i < etats.size(); i++) {
-            System.arraycopy(lignes.get(i), 0, suivant, i * nbColonnes, nbColonnes);
-            finaux[i] = afd.getFinaux().contains(etats.get(i));
+        tab = new int[pile.size() * nc];
+        fin = new boolean[pile.size()];
+
+        for (int i = 0; i < pile.size(); i++) {
+            System.arraycopy(rangs.get(i), 0, tab, i * nc, nc);
+            fin[i] = afd.getFinaux().contains(pile.get(i));
         }
     }
 
-    // même parcours que MatcherUnePasse.contientMotif
     @Override
     public boolean contientMotif(String ligne) {
-        if (finaux[0]) {
+        if (fin[0])
             return true;
-        }
+
         int e = 0;
         for (int i = 0; i < ligne.length(); i++) {
-            e = suivant[e * nbColonnes + colonne[ligne.charAt(i)]];
-            if (e == MORT) {
-                return false;
-            }
-            if (finaux[e]) {
+            e = tab[e * nc + col[ligne.charAt(i)]];
+            if (e == MORT)
+                return false; // plus de chemin
+
+            if (fin[e])
                 return true;
-            }
         }
         return false;
     }
 
-    // le mot entier vérifie-t-il la regex ? (automate construit sans l'enveloppe ".*")
-    // On lit tout le mot ; il faut finir dans un état final.
+    // Ici, il faut que le mot entier passe
     public boolean reconnait(String mot) {
         int e = 0;
         for (int i = 0; i < mot.length(); i++) {
-            e = suivant[e * nbColonnes + colonne[mot.charAt(i)]];
-            if (e == MORT) {
+            e = tab[e * nc + col[mot.charAt(i)]];
+            if (e == MORT)
                 return false;
-            }
         }
-        return finaux[e];
+
+        return fin[e];
     }
 
     public int nbEtats() {
-        return finaux.length;
+        return fin.length;
     }
 }

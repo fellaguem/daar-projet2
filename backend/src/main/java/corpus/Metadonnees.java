@@ -8,51 +8,46 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-/*
- * Metadonnees des livres, lues dans metadonnees.tsv (ecrit par TelechargeCorpus).
- *
- * une ligne par livre : id, titre, auteur, langue, urlSource, nbMots (separes par des tabulations)
- */
-
-
+// les infos des livres, récupérées depuis metadonnees.tsv
+// id, titre, auteur, langue, lien et nombre de mots
 public final class Metadonnees {
 
-    public record Livre(int id, String titre, String auteur, String langue, String urlSource, int nbMots) {}
+  public record Livre(int id, String titre, String auteur, String langue, String urlSource, int nbMots) {}
 
     private final Map<Integer, Livre> livres;
 
-    private Metadonnees(Map<Integer, Livre> livres) {
-        this.livres = livres;
-    }
+  private Metadonnees(Map<Integer, Livre> livres) {
+       this.livres = livres;
+  }
 
     public static Metadonnees charger(Path fichier) throws IOException {
 
-        Map<Integer, Livre> livres = new HashMap<>();
+      Map<Integer,Livre> tbl = new HashMap<>();
 
-        for (String ligne : Files.readAllLines(fichier, StandardCharsets.UTF_8)) {
+        for(String ln : Files.readAllLines(fichier,StandardCharsets.UTF_8)) {
 
-            String[] c = ligne.split("\t", -1);
-            if (c.length < 6) {
-                continue; 
-            }
+          String[] c=ln.split("\t",-1);
+          if(c.length < 6) continue;  // ligne incomplète
 
             try {
-                int id = Integer.parseInt(c[0].trim());
-                livres.put(id, new Livre(id, c[1], c[2], c[3], c[4], Integer.parseInt(c[5].trim())));
-            } catch (NumberFormatException e) {
-                //  on ignore la ligne illisible 
+              int n = Integer.parseInt(c[0].trim());
+
+              tbl.put(n,new Livre(n,c[1], c[2],c[3], c[4],Integer.parseInt(c[5].trim())));
+            }
+            catch(NumberFormatException ex) {
+                // valeur illisible, on passe
             }
         }
 
-        return new Metadonnees(livres);
+      return new Metadonnees(tbl);
     }
 
-    // null si l'id est inconnu
+   // null si le livre n'existe pas
     public Livre livre(int id) {
         return livres.get(id);
     }
 
-    public int taille() {
-        return livres.size();
-    }
+  public int taille() {
+      return livres.size();
+  }
 }

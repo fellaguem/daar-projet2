@@ -1,4 +1,4 @@
-// Largeur « téléphone » : la même valeur que le @media (max-width: 600px) de style.css.
+// Largeur « téléphone
 // Si on la change, changer les deux.
 const TELEPHONE = '(max-width: 600px)'
 

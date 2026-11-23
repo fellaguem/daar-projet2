@@ -6,73 +6,63 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 
-
-/*
- * Filtres appliques aux livres du catalogue, avant le telechargement 
- * titres exclus (listes de mots ou de chiffres, pas un vrai livre)
- * doublons (meme titre et meme auteur qu'un livre deja garde)
- */
-
+// Filtres avant de telecharger les livres
+// on retire certains titres et les doublons
 public final class Filtres {
 
+  private Filtres() { }
 
-    private Filtres() {}
+    // pas vraiment des livres
+    private static final List<String> MOTS_EXCLUS = List.of(
+      "factbook", "census", "thesaurus", "dictionary", "gazetteer");
 
-    // titres qui ne sont pas un vrai livre (listes de mots ou de chiffres)
-    private static final List<String> MOTS_EXCLUS =
-        List.of("factbook", "census", "thesaurus", "dictionary", "gazetteer");
-
-    // mots qui changent d'une edition a l'autre sans changer le livre
-    private static final Set<String> MOTS_NEUTRES =
+   // variations qu'on ignore entre editions
+   private static final Set<String> MOTS_NEUTRES =
         Set.of("the", "a", "an", "of", "and", "complete", "illustrated", "annotated", "unabridged", "edition");
 
 
-    // vrai si le titre contient un mot exclu (majuscules ignorees)
     public static boolean titreExclu(String titre) {
+       String txt = titre.toLowerCase(Locale.ROOT);
 
-        String bas = titre.toLowerCase(Locale.ROOT);
-
-        for (String mot : MOTS_EXCLUS) {
-            if (bas.contains(mot)) {
-                return true;
-            }
+        for (String w : MOTS_EXCLUS) {
+            if(txt.contains(w)) return true;
         }
 
-        return false;
+       return false;
     }
 
-    // cle d'un livre (titre + auteur) : meme cle = doublon
-    // sans majuscules, ponctuation, mots neutres ni dates, ordre des mots ignore
+   // titre + auteur : meme cle, meme livre
     public static String cleDoublon(String titre, String auteur) {
-        return mots(titre, true) + "|" + mots(auteur, false);
+       return mots(titre,true) + "|" + mots(auteur, false);
     }
 
-    // titre : on garde les chiffres ("Volume 1" et "Volume 2" sont deux livres differents)
+
     private static String mots(String texte, boolean estTitre) {
-        Set<String> mots = new TreeSet<>();
-        String separateur = estTitre ? "[^\\p{L}\\p{N}]+" : "[^\\p{L}]+";
+        Set<String> tri = new TreeSet<>(); // les mots seront tries directement
 
-        for (String mot : texte.toLowerCase(Locale.ROOT).split(separateur)) {
+       String sep = estTitre ? "[^\\p{L}\\p{N}]+" : "[^\\p{L}]+";
 
-            if (!mot.isEmpty() && !(estTitre && MOTS_NEUTRES.contains(mot))) {
-                mots.add(mot);
-            }
+        for(String w : texte.toLowerCase(Locale.ROOT).split(sep)) {
+
+          if (!w.isEmpty() && !(estTitre && MOTS_NEUTRES.contains(w)))
+             tri.add(w);
         }
-        return String.join(" ", mots);
+
+        return String.join(" ",tri);
     }
 
-    // carnet des livres deja gardes : un nouveau livre est un doublon s'il a la meme cle
-    // le catalogue est lu par id croissant : on garde donc le plus petit id
+    // garde une trace de ce qui est deja passe
     public static class Doublons {
 
-        private final Set<String> cles = new HashSet<>();
+       private final Set<String> cles = new HashSet<>();
 
         public boolean estDoublon(String titre, String auteur) {
-            return cles.contains(cleDoublon(titre, auteur));
+           return cles.contains(cleDoublon(titre,auteur));
         }
 
+
         public void enregistrer(String titre, String auteur) {
-            cles.add(cleDoublon(titre, auteur));
+            cles.add(cleDoublon(titre, auteur)); // on le garde pour la suite
         }
     }
 }

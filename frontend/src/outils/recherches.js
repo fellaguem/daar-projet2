@@ -1,6 +1,5 @@
 // Ce que partagent la barre de recherche, l'accueil et la page Résultats.
 
-// tris proposés sur la page Résultats (paramètre tri de l'API) : produit (pertinence, par défaut),
 // occurrences ou pagerank
 export const TRIS = [
   { valeur: 'produit', libelle: 'Pertinence' },
@@ -15,7 +14,6 @@ export const EXEMPLES = {
 }
 
 // adresse de la page Résultats pour une recherche.
-// La regex est testée sur les mots de l'index (le mode « texte complet » sert seulement aux mesures).
 export function adresseRecherche(texte, mode) {
   const params = new URLSearchParams()
   params.set(mode === 'regex' ? 'regex' : 'q', texte)

@@ -13,7 +13,7 @@ function unAuteur(texte, avecDates) {
   return nom + ' (' + (m[3] || '') + '–' + (m[4] || '') + ')'
 }
 
-// Les contributeurs avec un rôle (« [Editor] », « [Illustrator] », « [Author of introduction, etc.] »)
+// Les contributeurs avec un rôle
 // sont retirés, sauf s'il n'y a qu'eux. Une partie au format inattendu est gardée telle quelle.
 export function formaterAuteur(auteur, avecDates = true) {
   const parties = auteur.split(';').map((a) => a.trim()).filter(Boolean)

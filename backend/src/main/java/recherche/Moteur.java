@@ -19,22 +19,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-// Le moteur de recherche complet, utilisé par l'API.
-//
-// Au démarrage, il charge depuis un dossier (data/ ou data/test20/) :
-//   index.bin, graphe.bin, pagerank.bin, metadonnees.tsv, livres/ID.txt (pour les extraits)
-// Ensuite tout est en lecture seule : plusieurs clients peuvent chercher en même temps.
-//
-// Classement (tri "produit", par défaut) :
-//   score = (occurrences des mots non vides / nombre de mots du livre) × PageRank du livre
-// Les mots vides (présents dans plus de 50 % des livres, même seuil que pour Jaccard) restent
-// dans la recherche (ET pour un mot-clef) mais ne comptent pas dans le score. Si tous les mots
-// de la requête sont vides, on les compte tous.
-// Autres tris, pour comparer dans le rapport : "occurrences" (occurrences totales) et "pagerank".
-//
-// Suggestions : les voisins dans le graphe de Jaccard des 3 premiers résultats qui ont des voisins
-// (cherchés parmi les 10 premiers : 14 % des livres sont isolés), sauf ces livres eux-mêmes,
-// du plus proche au plus loin (distance au plus proche d'entre eux), 10 au plus.
+// Le moteur utilisé par l'API. Tout est chargé au départ depuis data/
+// Les requêtes ne modifient rien, donc plusieurs clients peuvent chercher
 public final class Moteur {
 
     public static final int NB_PREMIERS_POUR_SUGGESTIONS = 3;
@@ -47,84 +33,95 @@ public final class Moteur {
     public enum Tri {
         PRODUIT, OCCURRENCES, PAGERANK;
 
-        // null ou vide : PRODUIT
-        public static Tri lire(String texte) {
-            if (texte == null || texte.isBlank()) {
+        // sans tri précisé, on prend celui-ci
+        public static Tri lire(String v) {
+            if (v == null || v.isBlank()) {
                 return PRODUIT;
+
             }
-            switch (texte.strip().toLowerCase(Locale.ROOT)) {
-                case "produit": return PRODUIT;
-                case "occurrences": return OCCURRENCES;
-                case "pagerank": return PAGERANK;
-                default: throw new RequeteInvalide("Tri inconnu : " + texte + " (produit, occurrences ou pagerank).");
+            switch (v.strip().toLowerCase(Locale.ROOT)) {
+                case "produit":
+                    return PRODUIT;
+                case "occurrences":
+                    return OCCURRENCES;
+                case "pagerank":
+                    return PAGERANK;
+                default:
+                    throw new RequeteInvalide("Tri inconnu : " + v + " (produit, occurrences ou pagerank).");
             }
         }
     }
 
-    public record LivreCourt(int id, String titre, String auteur) {}
+    public record LivreCourt(int id, String titre, String auteur) {
+    }
 
-    public record LivreTrouve(int id, String titre, String auteur, int occurrences, double pagerank, double score) {}
+    public record LivreTrouve(int id, String titre, String auteur, int occurrences, double pagerank, double score) {
+    }
 
-    // nbMotsTrouves, motsTrouves et motEntier valent null pour une recherche par mot-clef
+    // ces trois champs restent null pour les mots-clés
     public record Reponse(String requete, String type, double tempsMs, List<LivreTrouve> resultats,
-                          List<LivreCourt> suggestions, Integer nbMotsTrouves, List<String> motsTrouves,
-                          Boolean motEntier) {}
+            List<LivreCourt> suggestions, Integer nbMotsTrouves, List<String> motsTrouves,
+            Boolean motEntier) {
+    }
 
     public record Fiche(int id, String titre, String auteur, String urlSource, String extrait,
-                        List<LivreCourt> voisins) {}
+            List<LivreCourt> voisins) {
+    }
 
     private final Index index;
     private final Graphe graphe;
-    private final double[] pagerank;      // par numéro de livre (ordre de l'index)
+    private final double[] pagerank; // même ordre que l'index
     private final Metadonnees meta;
     private final Path dossierLivres;
-    private final boolean[] motVide;      // par numéro de mot
+    private final boolean[] motVide; // les mots trop présents
     private final Map<Integer, Integer> numeroParId = new HashMap<>();
     private final RechercheIndex rechercheIndex;
     private final RechercheRegex rechercheRegex;
 
-    // ---------- chargement ----------
+    // chargement
 
-    public static Moteur charger(Path dossier) throws IOException {
-        for (String nom : List.of("index.bin", "graphe.bin", "pagerank.bin", "metadonnees.tsv")) {
-            if (!Files.exists(dossier.resolve(nom))) {
-                throw new IOException("Fichier manquant : " + dossier.resolve(nom).toAbsolutePath()
-                    + " (construire l'index avec ConstructionIndex puis le graphe avec ConstructionGraphe)");
+    public static Moteur charger(Path base) throws IOException {
+        for (String f : List.of("index.bin", "graphe.bin", "pagerank.bin", "metadonnees.tsv")) {
+            if (!Files.exists(base.resolve(f))) {
+                throw new IOException("Fichier manquant : " + base.resolve(f).toAbsolutePath()
+                        + " (construire l'index avec ConstructionIndex puis le graphe avec ConstructionGraphe)");
             }
         }
-        Index index = Index.charger(dossier.resolve("index.bin"));
-        Graphe graphe = Graphe.charger(dossier.resolve("graphe.bin"));
-        PageRank.Scores scores = PageRank.charger(dossier.resolve("pagerank.bin"));
-        Metadonnees meta = Metadonnees.charger(dossier.resolve("metadonnees.tsv"));
+        Index idx = Index.charger(base.resolve("index.bin"));
+        Graphe g = Graphe.charger(base.resolve("graphe.bin"));
+        PageRank.Scores rangs = PageRank.charger(base.resolve("pagerank.bin"));
+        Metadonnees md = Metadonnees.charger(base.resolve("metadonnees.tsv"));
 
-        // l'index, le graphe et le PageRank doivent parler des mêmes livres, dans le même ordre
-        int[] ids = new int[index.nbLivres()];
-        for (int i = 0; i < ids.length; i++) {
-            ids[i] = index.idLivre(i);
+        // on vérifie que les fichiers vont ensemble
+        int[] ids0 = new int[idx.nbLivres()];
+        for (int i = 0; i < ids0.length; i++) {
+
+            ids0[i] = idx.idLivre(i);
         }
-        if (!Arrays.equals(ids, graphe.idsLivres()) || !Arrays.equals(ids, scores.idsLivres())) {
+        if (!Arrays.equals(ids0, g.idsLivres()) || !Arrays.equals(ids0, rangs.idsLivres())) {
             throw new IOException("index.bin, graphe.bin et pagerank.bin ne contiennent pas les mêmes livres "
-                + "(reconstruire le graphe avec ConstructionGraphe après l'index)");
+                    + "(reconstruire le graphe avec ConstructionGraphe après l'index)");
         }
-        return new Moteur(index, graphe, scores.scores(), meta, dossier.resolve("livres"));
+        return new Moteur(idx, g, rangs.scores(), md, base.resolve("livres"));
     }
 
-    Moteur(Index index, Graphe graphe, double[] pagerank, Metadonnees meta, Path dossierLivres) {
-        this.index = index;
-        this.graphe = graphe;
-        this.pagerank = pagerank;
-        this.meta = meta;
-        this.dossierLivres = dossierLivres;
-        this.rechercheIndex = new RechercheIndex(index);
-        this.rechercheRegex = new RechercheRegex(index);
+    Moteur(Index idx, Graphe g, double[] pr, Metadonnees md, Path rep) {
+        this.index = idx;
+        this.graphe = g;
+        this.pagerank = pr;
+        this.meta = md;
+        this.dossierLivres = rep;
+        this.rechercheIndex = new RechercheIndex(idx);
 
-        for (int i = 0; i < index.nbLivres(); i++) {
-            numeroParId.put(index.idLivre(i), i);
+        this.rechercheRegex = new RechercheRegex(idx);
+
+        for (int i = 0; i < idx.nbLivres(); i++) {
+            numeroParId.put(idx.idLivre(i), i);
         }
-        int dfMax = (int) Math.floor(Jaccard.PART_MAX_DEFAUT * index.nbLivres());
-        motVide = new boolean[index.nbMots()];
-        for (int m = 0; m < index.nbMots(); m++) {
-            motVide[m] = index.fin(m) - index.debut(m) > dfMax;
+        int lim = (int) Math.floor(Jaccard.PART_MAX_DEFAUT * idx.nbLivres()); // seuil des mots vides
+        motVide = new boolean[idx.nbMots()];
+        for (int m = 0; m < idx.nbMots(); m++) {
+            motVide[m] = idx.fin(m) - idx.debut(m) > lim;
         }
     }
 
@@ -132,13 +129,10 @@ public final class Moteur {
         return index.nbLivres();
     }
 
-    // Démarrage "à chaud" : quelques recherches lancées au démarrage du serveur, avant le premier
-    // client. Java compile le code le plus utilisé pendant les premiers appels : sans cela, la
-    // première regex de la démo prenait 759 ms au lieu de quelques dizaines. Ne change rien à
-    // l'état du moteur (tout est en lecture seule). Renvoie le temps passé, en millisecondes.
+    // quelques recherches au démarrage pour éviter un premier appel trop lent
     public long chauffer() {
-        long debut = System.nanoTime();
-        for (int tour = 0; tour < NB_TOURS_CHAUFFE; tour++) {
+        long t0 = System.nanoTime();
+        for (int t = 0; t < NB_TOURS_CHAUFFE; t++) {
             chercherMotCle("the whale", null);
             chercherMotCle("ship sea", "occurrences");
             chercherRegex("wh(a|e)le", "index", null, null);
@@ -147,242 +141,261 @@ public final class Moteur {
                 livre(index.idLivre(0));
             }
         }
-        return (System.nanoTime() - debut) / 1_000_000;
+        return (System.nanoTime() - t0) / 1_000_000; // millisecondes
     }
 
-    public boolean estMotVide(String mot) {
-        int m = index.trouver(mot);
-        return m >= 0 && motVide[m];
+    public boolean estMotVide(String w) {
+        int k = index.trouver(w);
+        return k >= 0 && motVide[k];
     }
 
-    // ---------- recherche par mot-clef ----------
+    // mots-clés
 
-    public Reponse chercherMotCle(String requete, String tri) {
-        long debut = System.nanoTime();
-        Tri ordre = Tri.lire(tri);
+    public Reponse chercherMotCle(String q, String triTxt) {
+        long t0 = System.nanoTime();
 
-        List<String> mots = new ArrayList<>(new LinkedHashSet<>(Index.motsDeRequete(requete == null ? "" : requete)));
-        if (mots.isEmpty()) {
-            throw new RequeteInvalide("Aucun mot à chercher (les mots d'une seule lettre et la ponctuation sont ignorés).");
+        Tri choix = Tri.lire(triTxt);
+
+        List<String> ws = new ArrayList<>(new LinkedHashSet<>(Index.motsDeRequete(q == null ? "" : q)));
+        if (ws.isEmpty()) {
+            throw new RequeteInvalide(
+                    "Aucun mot à chercher (les mots d'une seule lettre et la ponctuation sont ignorés).");
         }
-        List<Resultat> trouves = rechercheIndex.motCle(requete);
+        List<Resultat> hits = rechercheIndex.motCle(q);
 
-        // mots qui comptent dans le score : les mots non vides (ou tous, s'ils sont tous vides)
-        List<Integer> numeros = new ArrayList<>();
-        for (String mot : mots) {
-            int m = index.trouver(mot);
-            if (m >= 0) {
-                numeros.add(m);
+        // on garde les mots utiles au calcul du score
+        List<Integer> num = new ArrayList<>();
+        for (String w : ws) {
+            int k = index.trouver(w);
+            if (k >= 0) {
+                num.add(k);
             }
         }
-        List<Integer> utiles = motsUtiles(numeros);
+        List<Integer> bons = motsUtiles(num); // évite les mots trop fréquents
 
-        int[] occUtiles = new int[trouves.size()];
-        for (int r = 0; r < trouves.size(); r++) {
-            for (int m : utiles) {
-                occUtiles[r] += index.occurrences(m, trouves.get(r).livre());
+        int[] freq = new int[hits.size()];
+        for (int i = 0; i < hits.size(); i++) {
+            for (int k : bons) {
+
+                freq[i] += index.occurrences(k, hits.get(i).livre());
             }
         }
-        return reponse(requete, "motcle", debut, trouves, occUtiles, ordre, null, null, null);
+        return reponse(q, "motcle", t0, hits, freq, choix, null, null, null);
     }
 
-    // ---------- recherche par regex ----------
+    // regex
 
-    // motEntier : "true" (défaut, aussi pour null ou vide) ou "false" (sous-chaîne), voir RechercheRegex
-    public Reponse chercherRegex(String regex, String mode, String motEntier, String tri) {
-        long debut = System.nanoTime();
-        String m = mode == null || mode.isBlank() ? "index" : mode.strip().toLowerCase(Locale.ROOT);
-        if (m.equals("texte")) {
+    // true = mot entier ; false = sous-chaîne
+    public Reponse chercherRegex(String rx, String mode0, String entTxt, String triTxt) {
+        long t0 = System.nanoTime();
+        String voie = mode0 == null || mode0.isBlank() ? "index" : mode0.strip().toLowerCase(Locale.ROOT);
+
+        if (voie.equals("texte")) {
             throw new RequeteInvalide("La recherche dans le texte complet n'est pas disponible dans l'application "
-                + "(elle sert aux mesures) : utiliser mode=index.");
+                    + "(elle sert aux mesures) : utiliser mode=index.");
         }
-        if (!m.equals("index")) {
-            throw new RequeteInvalide("Mode inconnu : " + mode + " (index ou texte).");
+        if (!voie.equals("index")) {
+            throw new RequeteInvalide("Mode inconnu : " + mode0 + " (index ou texte).");
         }
-        boolean entier = lireMotEntier(motEntier);
-        Tri ordre = Tri.lire(tri);
+        boolean plein = lireMotEntier(entTxt);
+        Tri choix = Tri.lire(triTxt);
 
-        RechercheRegex.Reponse rep = rechercheRegex.chercher(regex, entier);
+        RechercheRegex.Reponse rep = rechercheRegex.chercher(rx, plein);
 
-        // occurrences des mots trouvés non vides (ou de tous, s'ils sont tous vides), par livre
-        int[] parLivre = new int[index.nbLivres()];
-        for (int mot : motsUtiles(rep.numerosMots())) {
-            for (int p = index.debut(mot); p < index.fin(mot); p++) {
-                parLivre[index.livreDuPosting(p)] += index.occurrencesDuPosting(p);
+        // on compte les occurrences utiles pour chaque livre
+        int[] compte = new int[index.nbLivres()];
+        for (int w : motsUtiles(rep.numerosMots())) {
+            for (int j = index.debut(w); j < index.fin(w); j++) {
+                compte[index.livreDuPosting(j)] += index.occurrencesDuPosting(j);
             }
         }
-        List<Resultat> trouves = rep.resultats();
-        int[] occUtiles = new int[trouves.size()];
-        for (int r = 0; r < trouves.size(); r++) {
-            occUtiles[r] = parLivre[trouves.get(r).livre()];
+        List<Resultat> hits = rep.resultats();
+        int[] freq = new int[hits.size()];
+        for (int i = 0; i < hits.size(); i++) {
+            freq[i] = compte[hits.get(i).livre()];
         }
-        return reponse(regex, "regex", debut, trouves, occUtiles, ordre, rep.nbMotsTrouves(), rep.motsTrouves(),
-            entier);
+        return reponse(rx, "regex", t0, hits, freq, choix, rep.nbMotsTrouves(), rep.motsTrouves(),
+                plein);
     }
 
-    private static boolean lireMotEntier(String texte) {
-        if (texte == null || texte.isBlank()) {
+    private static boolean lireMotEntier(String v) {
+        if (v == null || v.isBlank()) {
             return true;
         }
-        switch (texte.strip().toLowerCase(Locale.ROOT)) {
-            case "true": return true;
-            case "false": return false;
-            default: throw new RequeteInvalide("motEntier doit valoir true ou false : " + texte);
+        switch (v.strip().toLowerCase(Locale.ROOT)) {
+            case "true":
+                return true;
+            case "false":
+                return false;
+            default:
+                throw new RequeteInvalide("motEntier doit valoir true ou false : " + v);
         }
     }
 
-    private List<Integer> motsUtiles(List<Integer> numeros) {
-        List<Integer> utiles = new ArrayList<>();
-        for (int m : numeros) {
-            if (!motVide[m]) {
-                utiles.add(m);
+    private List<Integer> motsUtiles(List<Integer> num) {
+
+        List<Integer> bons = new ArrayList<>();
+        for (int k : num) {
+            if (!motVide[k]) {
+
+                bons.add(k);
             }
         }
-        return utiles.isEmpty() ? numeros : utiles;
+        return bons.isEmpty() ? num : bons;
     }
 
-    // ---------- classement et suggestions ----------
+    // classement + suggestions
 
-    // un résultat avec son numéro de livre (pour le graphe)
-    private record Classe(int livre, LivreTrouve trouve) {}
+    // on garde aussi la position dans le graphe
+    private record Classe(int livre, LivreTrouve trouve) {
+    }
 
-    private Reponse reponse(String requete, String type, long debut, List<Resultat> trouves, int[] occUtiles,
-                            Tri ordre, Integer nbMotsTrouves, List<String> motsTrouves, Boolean motEntier) {
-        List<Classe> classes = new ArrayList<>(trouves.size());
-        for (int r = 0; r < trouves.size(); r++) {
-            int livre = trouves.get(r).livre();
-            int longueur = index.longueurLivre(livre);
-            double score = longueur == 0 ? 0 : (double) occUtiles[r] / longueur * pagerank[livre];
-            Metadonnees.Livre l = meta.livre(index.idLivre(livre));
-            classes.add(new Classe(livre, new LivreTrouve(index.idLivre(livre), titre(l, livre), auteur(l),
-                trouves.get(r).occurrences(), pagerank[livre], score)));
+    private Reponse reponse(String q, String typ, long t0, List<Resultat> hits, int[] freq,
+            Tri choix, Integer nbW, List<String> motsOK, Boolean plein) {
+        List<Classe> rangs = new ArrayList<>(hits.size());
+        for (int i = 0; i < hits.size(); i++) {
+            int b = hits.get(i).livre();
+            int lg = index.longueurLivre(b);
+            double sc = lg == 0 ? 0 : (double) freq[i] / lg * pagerank[b];
+            Metadonnees.Livre md = meta.livre(index.idLivre(b));
+            rangs.add(new Classe(b, new LivreTrouve(index.idLivre(b), titre(md, b), auteur(md),
+                    hits.get(i).occurrences(), pagerank[b], sc)));
         }
 
-        Comparator<Classe> parScore = Comparator.comparingDouble((Classe c) -> c.trouve().score()).reversed();
-        Comparator<Classe> parId = Comparator.comparingInt((Classe c) -> c.trouve().id());
-        Comparator<Classe> comparateur = switch (ordre) {
-            case PRODUIT -> parScore
-                .thenComparing(Comparator.comparingInt((Classe c) -> c.trouve().occurrences()).reversed())
-                .thenComparing(parId);
+        Comparator<Classe> parSc = Comparator.comparingDouble((Classe c) -> c.trouve().score()).reversed();
+        Comparator<Classe> parNum = Comparator.comparingInt((Classe c) -> c.trouve().id());
+        Comparator<Classe> cmp = switch (choix) {
+            case PRODUIT -> parSc
+                    .thenComparing(Comparator.comparingInt((Classe c) -> c.trouve().occurrences()).reversed())
+                    .thenComparing(parNum);
             case OCCURRENCES -> Comparator.comparingInt((Classe c) -> c.trouve().occurrences()).reversed()
-                .thenComparing(parScore).thenComparing(parId);
+                    .thenComparing(parSc).thenComparing(parNum);
+
             case PAGERANK -> Comparator.comparingDouble((Classe c) -> c.trouve().pagerank()).reversed()
-                .thenComparing(parScore).thenComparing(parId);
+                    .thenComparing(parSc).thenComparing(parNum);
         };
-        classes.sort(comparateur);
+        rangs.sort(cmp);
 
-        List<LivreTrouve> resultats = new ArrayList<>(classes.size());
-        for (Classe c : classes) {
-            resultats.add(c.trouve());
+        List<LivreTrouve> hitsOK = new ArrayList<>(rangs.size());
+        for (Classe c : rangs) {
+            hitsOK.add(c.trouve());
+
         }
-        List<LivreCourt> suggestions = suggestions(classes);
+        List<LivreCourt> suggestions = suggestions(rangs);
 
-        double tempsMs = Math.round((System.nanoTime() - debut) / 1e4) / 100.0;
-        return new Reponse(requete, type, tempsMs, resultats, suggestions, nbMotsTrouves, motsTrouves, motEntier);
+        double duree = Math.round((System.nanoTime() - t0) / 1e4) / 100.0;
+        return new Reponse(q, typ, duree, hitsOK, suggestions, nbW, motsOK, plein);
     }
 
-    private List<LivreCourt> suggestions(List<Classe> classes) {
-        // les "sources" : les 3 premiers résultats qui ont au moins un voisin, parmi les 10 premiers.
-        // Un résultat isolé passé n'a pas besoin d'être exclu : il n'est le voisin de personne.
-        List<Integer> sources = new ArrayList<>();
-        boolean[] estSource = new boolean[index.nbLivres()];
-        for (int r = 0; r < Math.min(NB_RESULTATS_EXPLORES, classes.size())
-                && sources.size() < NB_PREMIERS_POUR_SUGGESTIONS; r++) {
-            int livre = classes.get(r).livre();
-            if (graphe.degre(livre) > 0) {
-                sources.add(livre);
-                estSource[livre] = true;
+    private List<LivreCourt> suggestions(List<Classe> rangs) {
+        // on part des meilleurs résultats qui ont des voisins
+        List<Integer> dep = new ArrayList<>();
+        boolean[] pris = new boolean[index.nbLivres()];
+        for (int i = 0; i < Math.min(NB_RESULTATS_EXPLORES, rangs.size())
+                && dep.size() < NB_PREMIERS_POUR_SUGGESTIONS; i++) {
+            int b = rangs.get(i).livre();
+            if (graphe.degre(b) > 0) {
+                dep.add(b);
+                pris[b] = true;
             }
+
         }
 
-        // pour chaque voisin : sa distance à la plus proche des sources
-        Map<Integer, Float> distance = new HashMap<>();
-        for (int livre : sources) {
-            for (int p = graphe.debut(livre); p < graphe.fin(livre); p++) {
-                int v = graphe.voisin(p);
-                if (!estSource[v]) {
-                    distance.merge(v, graphe.distance(p), Math::min);
+        // distance au meilleur voisin de départ
+        Map<Integer, Float> dist = new HashMap<>();
+        for (int b : dep) {
+            for (int j = graphe.debut(b); j < graphe.fin(b); j++) {
+                int v0 = graphe.voisin(j);
+                if (!pris[v0]) {
+                    dist.merge(v0, graphe.distance(j), Math::min);
+
                 }
             }
         }
-        List<Integer> voisins = new ArrayList<>(distance.keySet());
-        voisins.sort(Comparator.comparing((Integer v) -> distance.get(v)).thenComparing(v -> index.idLivre(v)));
+        List<Integer> candidats = new ArrayList<>(dist.keySet());
+        candidats.sort(Comparator.comparing((Integer v0) -> dist.get(v0)).thenComparing(v0 -> index.idLivre(v0)));
 
-        List<LivreCourt> liste = new ArrayList<>();
-        for (int v : voisins.subList(0, Math.min(NB_SUGGESTIONS, voisins.size()))) {
-            liste.add(court(v));
+        List<LivreCourt> res = new ArrayList<>();
+        for (int v0 : candidats.subList(0, Math.min(NB_SUGGESTIONS, candidats.size()))) {
+            res.add(court(v0));
         }
-        return liste;
+        return res;
     }
 
-    // ---------- page d'un livre ----------
+    // fiche du livre
 
     public Fiche livre(int id) {
-        Integer numero = numeroParId.get(id);
-        if (numero == null) {
+        Integer pos = numeroParId.get(id);
+        if (pos == null) {
             throw new LivreIntrouvable(id);
         }
-        Metadonnees.Livre l = meta.livre(id);
-        List<LivreCourt> voisins = new ArrayList<>();
-        for (int p = graphe.debut(numero); p < graphe.fin(numero) && voisins.size() < NB_VOISINS; p++) {
-            voisins.add(court(graphe.voisin(p)));
+
+        Metadonnees.Livre md = meta.livre(id);
+        List<LivreCourt> proches = new ArrayList<>();
+        for (int j = graphe.debut(pos); j < graphe.fin(pos) && proches.size() < NB_VOISINS; j++) {
+            proches.add(court(graphe.voisin(j)));
+
         }
-        String url = l != null && !l.urlSource().isBlank() ? l.urlSource() : "https://www.gutenberg.org/ebooks/" + id;
-        return new Fiche(id, titre(l, numero), auteur(l), url, extrait(dossierLivres.resolve(id + ".txt")), voisins);
+        String lien = md != null && !md.urlSource().isBlank() ? md.urlSource()
+                : "https://www.gutenberg.org/ebooks/" + id;
+        return new Fiche(id, titre(md, pos), auteur(md), lien, extrait(dossierLivres.resolve(id + ".txt")), proches);
     }
 
-    // Début du texte : environ TAILLE_EXTRAIT caractères, coupés sur un espace.
-    // Les retours à la ligne à l'intérieur d'un paragraphe deviennent des espaces ;
-    // les paragraphes restent séparés par une ligne vide.
-    static String extrait(Path fichier) {
-        if (!Files.exists(fichier)) {
+    // un bout du texte, sans couper un mot au milieu
+    static String extrait(Path f) {
+        if (!Files.exists(f)) {
             return "";
         }
-        char[] tampon = new char[TAILLE_EXTRAIT * 4];
-        int lus = 0;
-        try (BufferedReader in = Files.newBufferedReader(fichier, StandardCharsets.UTF_8)) {
-            int n;
-            while (lus < tampon.length && (n = in.read(tampon, lus, tampon.length - lus)) > 0) {
-                lus += n;
+        char[] buf = new char[TAILLE_EXTRAIT * 4];
+        int lu = 0;
+        try (BufferedReader br = Files.newBufferedReader(f, StandardCharsets.UTF_8)) {
+            int nb;
+            while (lu < buf.length && (nb = br.read(buf, lu, buf.length - lu)) > 0) {
+                lu += nb;
             }
         } catch (IOException e) {
             return "";
         }
-        String texte = new String(tampon, 0, lus).replace("\r", "");
+        String txt = new String(buf, 0, lu).replace("\r", "");
 
-        StringBuilder sb = new StringBuilder();
-        for (String paragraphe : texte.split("\n\\s*\n")) {
-            String p = paragraphe.strip().replaceAll("\\s+", " ");
-            if (p.isEmpty()) {
+        StringBuilder b = new StringBuilder();
+        for (String bloc : txt.split("\n\\s*\n")) {
+            String s = bloc.strip().replaceAll("\\s+", " ");
+
+            if (s.isEmpty()) {
                 continue;
+
             }
-            if (sb.length() > 0) {
-                sb.append("\n\n");
+
+            if (b.length() > 0) {
+                b.append("\n\n");
             }
-            sb.append(p);
-            if (sb.length() >= TAILLE_EXTRAIT) {
+            b.append(s);
+
+            if (b.length() >= TAILLE_EXTRAIT) {
                 break;
             }
+
         }
-        if (sb.length() <= TAILLE_EXTRAIT) {
-            return sb.toString();
+        if (b.length() <= TAILLE_EXTRAIT) {
+            return b.toString();
         }
-        int coupe = sb.lastIndexOf(" ", TAILLE_EXTRAIT);
-        return sb.substring(0, coupe > 0 ? coupe : TAILLE_EXTRAIT) + " …";
+        int cut = b.lastIndexOf(" ", TAILLE_EXTRAIT);
+        return b.substring(0, cut > 0 ? cut : TAILLE_EXTRAIT) + " …";
     }
 
-    // ---------- petits outils ----------
+    // petits utilitaires
 
-    private LivreCourt court(int livre) {
-        Metadonnees.Livre l = meta.livre(index.idLivre(livre));
-        return new LivreCourt(index.idLivre(livre), titre(l, livre), auteur(l));
+    private LivreCourt court(int b) {
+        Metadonnees.Livre md = meta.livre(index.idLivre(b));
+        return new LivreCourt(index.idLivre(b), titre(md, b), auteur(md));
     }
 
-    private String titre(Metadonnees.Livre l, int livre) {
-        return l != null ? l.titre() : "Livre " + index.idLivre(livre);
+    private String titre(Metadonnees.Livre md, int b) {
+        return md != null ? md.titre() : "Livre " + index.idLivre(b);
     }
 
-    private static String auteur(Metadonnees.Livre l) {
-        return l != null ? l.auteur() : "";
+    private static String auteur(Metadonnees.Livre md) {
+        return md != null ? md.auteur() : "";
     }
 }

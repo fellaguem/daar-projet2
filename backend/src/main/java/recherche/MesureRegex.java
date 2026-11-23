@@ -9,15 +9,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
 
-// Mesure le temps de la recherche par regex dans l'index (moyenne et écart type), pour les courbes du rapport.
-//
-//   java -cp backend/target/classes recherche.MesureRegex [--index data/index.bin] [--essais 10]
-//                                                         [--sortie data/mesures/regex_index.csv]
-//
-// Le temps mesuré est celui d'un appel complet à RechercheRegex.chercher : lecture de la regex,
-// construction de l'automate, test sur tout le vocabulaire, regroupement des livres.
-// Chaque regex est mesurée en mot entier (défaut de l'API) et en sous-chaîne ; ".*" seulement en
-// mot entier (en sous-chaîne, elle accepte le mot vide et est refusée).
+// Mesure le temps de la recherche par regex dans l'index (moyenne et écart type), pour les courbes du rapport
 public class MesureRegex {
 
     private static final List<String> REGEXS = List.of(

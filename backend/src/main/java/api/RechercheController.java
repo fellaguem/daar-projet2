@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import recherche.Moteur;
 
-// Routes de recherche (voir docs/api.md)
+// Routes de recherche
 @RestController
 @RequestMapping("/api/search")
 public class RechercheController {
@@ -24,8 +24,7 @@ public class RechercheController {
         return Dto.depuis(moteur.chercherMotCle(q, tri));
     }
 
-    // mode = index (par défaut) ou texte (réservé aux mesures : erreur 400)
-    // motEntier = true (par défaut : le mot entier vérifie la regex) ou false (un morceau du mot)
+    // mode = index (par défaut) ou texte
     @GetMapping("/advanced")
     public Dto.ReponseRecherche avancee(@RequestParam String regex,
                                         @RequestParam(defaultValue = "index") String mode,
