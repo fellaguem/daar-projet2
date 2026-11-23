@@ -11,7 +11,6 @@ Depuis `frontend/` :
 |---|---|
 | `npm ci` | installe les dépendances (une fois) |
 | `npm run dev` | serveur de développement (port 5173) ; `/api` est envoyé au serveur Spring Boot sur 8080 |
-| `npm run dev:mock` | même chose sans serveur : réponses factices (`src/api/factices.js`) |
 | `npm run build` | build dans `backend/src/main/resources/static` ; reconstruire ensuite le jar (`.\mvnw.cmd package`) pour qu'il le contienne |
 
 ## Organisation
@@ -36,8 +35,7 @@ src/
 │   ├── Repliable.jsx        liste repliable (vrai bouton, aria-expanded)
 │   └── icones.jsx           icônes SVG décoratives
 ├── api/
-│   ├── client.js     appels HTTP ; une erreur porte le message du serveur et son statut (400, 404)
-│   └── factices.js   données du mode dev:mock
+│   └── client.js     appels HTTP ; une erreur porte le message du serveur et son statut (400, 404)
 └── outils/           fonctions sans React, partagées ou génériques
     │                 propres au projet, utilisées par plusieurs fichiers :
     ├── recherches.js exemples, tris, adresse d'une recherche, détection d'une regex
@@ -57,7 +55,7 @@ Où ranger quoi :
 - la logique sans React d'une seule page va dans un fichier `.js` à côté, dans le dossier de la page
   (`pages/resultats/place.js`) ;
 - une fonction sans React utilisée par plusieurs fichiers, ou générique, va dans `outils/` ;
-- un appel au serveur va dans `api/client.js`, avec sa réponse factice dans `api/factices.js` ;
+- un appel au serveur va dans `api/client.js` ;
 - un morceau d'interface utilisé par plusieurs pages va dans `components/`.
 
 ## Règles
