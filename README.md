@@ -34,7 +34,7 @@ Sous Linux ou macOS, remplacer `.\mvnw.cmd` par `./mvnw`.
 
 ```
 cd frontend
-npm ci
+npm install
 npm run build
 cd ../backend
 .\mvnw.cmd clean package
@@ -43,9 +43,10 @@ cd ..
 
 Ces commandes fabriquent l'application :
 
+- `npm install` installe les dépendances du front (React, Vite) dans `frontend/node_modules` ;
 - `npm run build` prépare le site (le front) ;
-- `mvnw clean package` compile le serveur, lance les tests et crée le fichier
-  `backend/target/moteur-recherche-0.1.0.jar`, qui contient tout : le serveur et le site.
+- `mvnw clean package` lance les 120 tests, puis crée le fichier
+- `backend/target/moteur-recherche-0.1.0.jar`, qui contient tout : le serveur et le site.
 
 L'ordre compte : il faut préparer le site avant le jar, sinon le jar ne le contient pas.
 
@@ -95,10 +96,10 @@ Depuis une autre machine du même réseau, ouvrir `http://IP-du-serveur:8080` (a
 
 ```
 cd backend; .\mvnw.cmd test; cd ..
+
 ```
 
-Quelques tests JUnit sur les parties principales : index, recherche par mot-clef et par regex,
-distance de Jaccard et PageRank. Pas besoin du corpus pour les lancer.
+120 tests JUnit, dont ceux du projet 1 (`backend/src/test/java/projet1`). Ils n'ont pas besoin du corpus.
 
 ## 7. Mesures et courbes
 
